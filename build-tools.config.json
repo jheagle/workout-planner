@@ -1,0 +1,28 @@
+{
+  "browser": {
+    "enabled": true,
+    "name": "workout-planner"
+  },
+  "cleanPaths": [
+    "dist",
+    "browser"
+  ],
+  "dist": {
+    "main": "dist/index.js",
+    "from": "src/**/!(*.test).js",
+    "to": "dist"
+  },
+  "fonts": {
+    "enabled": false
+  },
+  "images": {
+    "enabled": false
+  },
+  "sass": {
+    "enabled": false
+  },
+  "test": {
+    "path": "src",
+    "watch": "src/**/*.[cm]?[jt]s"
+  }
+}
