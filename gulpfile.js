@@ -3,6 +3,7 @@ export {
   dist,
   defaultCmd as default,
   bundle,
+  images,
   partials,
   readme,
   sass,

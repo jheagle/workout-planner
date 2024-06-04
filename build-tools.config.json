@@ -1,7 +1,7 @@
 {
   "browser": {
     "enabled": true,
-    "name": "workout-planner"
+    "name": "workoutPlanner"
   },
   "cleanPaths": [
     "dist",
@@ -9,20 +9,31 @@
   ],
   "dist": {
     "main": "dist/index.js",
-    "from": "src/**/!(*.test).js",
+    "from": "assets/js/**/!(*.test).js",
     "to": "dist"
   },
-  "fonts": {
-    "enabled": false
-  },
   "images": {
-    "enabled": false
+    "enabled": true,
+    "from": "assets/img/*",
+    "to": "browser/img"
+  },
+  "readme": {
+    "from": [
+      "assets/js/**/!(*.test).js"
+    ]
   },
   "sass": {
-    "enabled": false
+    "enabled": true,
+    "from": "assets/sass/**/*.+(scss|sass)",
+    "path": "assets/sass",
+    "to": "browser/css"
   },
+  "srcPath": "assets/js",
   "test": {
-    "path": "src",
-    "watch": "src/**/*.[cm]?[jt]s"
+    "options": {
+      "passWithNoTests": true
+    },
+    "path": "assets/js",
+    "watch": "assets/js/**/*.js"
   }
 }

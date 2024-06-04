@@ -1,0 +1,72 @@
+[
+  {
+    "name": "Abdominal",
+    "alias": "abs",
+    "image": "../img/abdominals.jpg"
+  },
+  {
+    "name": "Biceps",
+    "alias": "",
+    "image": ""
+  },
+  {
+    "name": "Calves",
+    "alias": "",
+    "image": ""
+  },
+  {
+    "name": "Deltoids",
+    "alias": "shoulders",
+    "image": ""
+  },
+  {
+    "name": "Erector Spinae",
+    "alias": "mid back, along spine",
+    "image": ""
+  },
+  {
+    "name": "Forearms",
+    "alias": "abs",
+    "image": ""
+  },
+  {
+    "name": "Gluteus Maximus",
+    "alias": "abs",
+    "image": ""
+  },
+  {
+    "name": "Hamstrings",
+    "alias": "abs",
+    "image": ""
+  },
+  {
+    "name": "Latissimus Dorsi",
+    "alias": "outer lower back",
+    "image": ""
+  },
+  {
+    "name": "Obliques",
+    "alias": "outer abs",
+    "image": ""
+  },
+  {
+    "name": "Pectorals",
+    "alias": "chest",
+    "image": ""
+  },
+  {
+    "name": "Quadriceps",
+    "alias": "quads",
+    "image": ""
+  },
+  {
+    "name": "Trapezius",
+    "alias": "upper back",
+    "image": ""
+  },
+  {
+    "name": "Triceps",
+    "alias": "",
+    "image": ""
+  }
+]
