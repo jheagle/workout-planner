@@ -1,5 +1,6 @@
 import { pageNavigation } from './components/templates/pageNavigation.js'
 import { workout } from './components/templates/workout.js'
+import { main } from './components/micro/main.js'
 
 window.jsonDom = jsonDom
 const mainHeader = pageNavigation()
@@ -11,7 +12,10 @@ documentItem.head.children.push(workoutTable.style)
 
 // Add the menu as the first child of body
 documentItem.body.children.unshift(mainHeader)
-documentItem.body.children.push(workoutTable.table)
+
+const mainContent = main([workoutTable.table])
+
+documentItem.body.children.push(mainContent)
 
 // Update the body child node list to include the header
 jsonDom.updateChildNodes(documentItem.head)
@@ -22,4 +26,4 @@ jsonDom.updateChildNodes(documentItem.body)
 // Update the header to generate the elements
 jsonDom.updateElements(mainHeader)
 // Update the table to generate the elements
-jsonDom.updateElements(workoutTable.table)
+jsonDom.updateElements(mainContent)
