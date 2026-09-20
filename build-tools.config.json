@@ -35,5 +35,7 @@
     },
     "path": "assets/js",
     "watch": "assets/js/**/*.js"
-  }
+  },
+  "relativePath": "http://joshuaheagle.local/projects/workout-planner",
+  "databasePath": "database/"
 }

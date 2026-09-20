@@ -1,5 +1,5 @@
 module.exports = {
   transform: {
-    '^.+\\.[cm]?[jt]sx?$': 'babel-jest'
+    '^.+\\.js$': 'babel-jest'
   }
 }

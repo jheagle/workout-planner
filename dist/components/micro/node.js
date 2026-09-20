@@ -13,13 +13,13 @@ exports.node = void 0
  * @param {object} [attributes={}]
  * @returns {DomItem}
  */
-var node = exports.node = function node (nodeName, nodeValue) {
-  var children = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : []
-  var attributes = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : {}
+const node = exports.node = function node (nodeName, nodeValue) {
+  const children = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : []
+  const attributes = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : {}
   return jsonDom.createDomItem({
-    nodeName: nodeName,
-    nodeValue: nodeValue,
-    attributes: attributes,
-    children: children
+    nodeName,
+    nodeValue,
+    attributes,
+    children
   })
 }

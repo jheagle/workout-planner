@@ -31,14 +31,25 @@
     "url": "https://github.com/jheagle/workout-planner/issues"
   },
   "homepage": "https://github.com/jheagle/workout-planner#readme",
+  "peerDependencies": {
+    "gulp-imagemin": ">=9.0.0"
+  },
+  "peerDependenciesMeta": {
+    "gulp-imagemin": {
+      "optional": true
+    }
+  },
   "devDependencies": {
-    "gulp": "^5.0.0",
-    "js-build-tools": "^4.0.1",
-    "test-filesystem": "^1.3.5"
+    "gulp": "^5.0.1",
+    "gulp-imagemin": "github:jheagle/gulp-imagemin#common-js-compatibility",
+    "js-build-tools": "^5.0.0",
+    "test-filesystem": "^1.3.14"
   },
   "dependencies": {
+    "browser-or-node": "^3.0.0",
     "json-dom": "github:jheagle/JSON-DOM",
+    "json-file-db": "github:jheagle/json-file-db",
     "matrix-dom": "github:jheagle/matrix-DOM",
-    "si-funciona": "^2.2.9"
+    "si-funciona": "^2.2.16"
   }
 }

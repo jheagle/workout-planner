@@ -1,0 +1,26 @@
+{
+  "path": "foo",
+  "definition": [
+    {
+      "name": "_id",
+      "type": "string",
+      "optional": false,
+      "keys": [
+        {
+          "type": "primary",
+          "references": [
+            "self"
+          ],
+          "autoGenerate": true
+        }
+      ]
+    },
+    {
+      "name": "bar",
+      "type": "string",
+      "optional": true,
+      "keys": []
+    }
+  ],
+  "entries": []
+}

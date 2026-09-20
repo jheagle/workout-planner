@@ -4,9 +4,12 @@ Plan daily and weekly workouts based on goals and muscle groups.
 
 <dl>
 <dt><a href="#workout">workout</a> ⇒ <code>DomItem</code></dt>
-<dd><p>Generates a menu with the provided index as the currently selected item.</p>
+<dd><p>Generates a table for a workout plan.</p>
 </dd>
 <dt><a href="#pageNavigation">pageNavigation</a> ⇒ <code>DomItem</code></dt>
+<dd><p>Generates a menu with the provided index as the currently selected item.</p>
+</dd>
+<dt><a href="#detail">detail</a> ⇒ <code>DomItem</code></dt>
 <dd><p>Generates a menu with the provided index as the currently selected item.</p>
 </dd>
 <dt><a href="#text">text</a> ⇒ <code>DomItem</code></dt>
@@ -39,6 +42,12 @@ Plan daily and weekly workouts based on goals and muscle groups.
 <a name="workout"></a>
 
 ## workout ⇒ <code>DomItem</code>
+Generates a table for a workout plan.
+
+**Kind**: global constant  
+<a name="pageNavigation"></a>
+
+## pageNavigation ⇒ <code>DomItem</code>
 Generates a menu with the provided index as the currently selected item.
 
 **Kind**: global constant  
@@ -47,9 +56,9 @@ Generates a menu with the provided index as the currently selected item.
 | --- | --- |
 | currentIndex | <code>number</code> | 
 
-<a name="pageNavigation"></a>
+<a name="detail"></a>
 
-## pageNavigation ⇒ <code>DomItem</code>
+## detail ⇒ <code>DomItem</code>
 Generates a menu with the provided index as the currently selected item.
 
 **Kind**: global constant  

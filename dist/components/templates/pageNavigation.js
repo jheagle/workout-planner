@@ -5,19 +5,19 @@ Object.defineProperty(exports, '__esModule', {
   value: true
 })
 exports.pageNavigation = void 0
-var _nav = require('../micro/nav.js')
-var _span = require('../micro/span.js')
-var _header = require('../micro/header.js')
-var _listItem = require('../micro/listItem.js')
-var _menu = require('../macro/menu.js')
+const _nav = require('../micro/nav.js')
+const _span = require('../micro/span.js')
+const _header = require('../micro/header.js')
+const _listItem = require('../micro/listItem.js')
+const _menu = require('../macro/menu.js')
 /**
  * Generates a menu with the provided index as the currently selected item.
  * @param {number} currentIndex
  * @returns {DomItem}
  */
-var pageNavigation = exports.pageNavigation = function pageNavigation () {
-  var currentIndex = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 1
-  var menuNav = (0, _menu.menu)([{
+const pageNavigation = exports.pageNavigation = function pageNavigation () {
+  const currentIndex = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 1
+  const menuNav = (0, _menu.menu)([{
     link: '#intro',
     text: 'Hello',
     className: 'third-menu'
