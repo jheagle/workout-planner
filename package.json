@@ -40,6 +40,9 @@
     }
   },
   "devDependencies": {
+    "@babel/plugin-proposal-throw-expressions": "^7.29.7",
+    "@babel/plugin-transform-modules-commonjs": "^7.29.7",
+    "@babel/preset-env": "^7.29.7",
     "gulp": "^5.0.1",
     "gulp-imagemin": "github:jheagle/gulp-imagemin#common-js-compatibility",
     "js-build-tools": "^5.0.0",
