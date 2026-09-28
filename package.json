@@ -7,7 +7,6 @@
   "scripts": {
     "build": "gulp build",
     "dev": "gulp",
-    "htmldocs": "jsdoc -R MAIN.md -c ./.jsdoc.conf.js -d docs",
     "readme": "gulp readme",
     "sass": "gulp sass",
     "test": "gulp testFull",
