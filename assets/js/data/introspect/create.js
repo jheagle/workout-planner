@@ -3,9 +3,9 @@ import { field } from './definitions/field.js'
 
 const gulpConfig = require('js-build-tools/gulp.config')
 const { writeFile, mkdir } = require('fs/promises')
-const databasePath = gulpConfig.get('databasePath', 'test-database/')
 
 export const create = async (record, definition = []) => {
+  const databasePath = gulpConfig.get('databasePath', 'test-database/')
   if (record === '__RECORDS') {
     return null
   }
@@ -18,5 +18,6 @@ export const create = async (record, definition = []) => {
     entries: []
   }
   await writeFile(`${databasePath}${record}.json`, JSON.stringify(recordContent, null, 2))
-  return await mkdir(`${databasePath}${record}`, { recursive: true })
+  await mkdir(`${databasePath}${record}`, { recursive: true })
+  return `${databasePath}${record}`
 }
