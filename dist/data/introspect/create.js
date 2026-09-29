@@ -29,10 +29,10 @@ const gulpConfig = require('js-build-tools/gulp.config')
 const _require = require('fs/promises')
 const writeFile = _require.writeFile
 const mkdir = _require.mkdir
-const databasePath = gulpConfig.get('databasePath', 'test-database/')
 const create = exports.create = /* #__PURE__ */(function () {
   const _ref = _asyncToGenerator(/* #__PURE__ */_regenerator().m(function _callee (record) {
     let definition
+    let databasePath
     let recordContent
     const _args = arguments
     return _regenerator().w(function (_context) {
@@ -40,6 +40,7 @@ const create = exports.create = /* #__PURE__ */(function () {
         switch (_context.n) {
           case 0:
             definition = _args.length > 1 && _args[1] !== undefined ? _args[1] : []
+            databasePath = gulpConfig.get('databasePath', 'test-database/')
             if (!(record === '__RECORDS')) {
               _context.n = 1
               break
@@ -65,7 +66,7 @@ const create = exports.create = /* #__PURE__ */(function () {
               recursive: true
             })
           case 4:
-            return _context.a(2, _context.v)
+            return _context.a(2, ''.concat(databasePath).concat(record))
         }
       }
     }, _callee)
