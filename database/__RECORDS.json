@@ -4,22 +4,25 @@
     {
       "name": "path",
       "type": "string",
-      "optional": false,
-      "keys": []
+      "optional": false
     },
     {
       "name": "definition",
       "type": "object",
-      "optional": false,
-      "keys": []
+      "optional": false
+    },
+    {
+      "name": "keys",
+      "type": "array",
+      "optional": false
     },
     {
       "name": "entries",
       "type": "array",
-      "optional": false,
-      "keys": []
+      "optional": false
     }
   ],
+  "keys":  [],
   "entries": [
     "exercise_muscle.json",
     "exercises.json",

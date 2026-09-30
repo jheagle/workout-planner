@@ -2,7 +2,7 @@
   "name": "workout-planner",
   "version": "1.0.0",
   "description": "Plan daily and weekly workouts based on targeted muscle groups.",
-  "main": "src/index.js",
+  "main": "dist/index.js",
   "type": "module",
   "scripts": {
     "build": "gulp build",
@@ -50,7 +50,7 @@
   "dependencies": {
     "browser-or-node": "^3.0.0",
     "json-dom": "github:jheagle/JSON-DOM",
-    "json-file-db": "github:jheagle/json-file-db",
+    "json-fs-query": "^1.0.0",
     "matrix-dom": "github:jheagle/matrix-DOM",
     "si-funciona": "^2.2.16"
   }
