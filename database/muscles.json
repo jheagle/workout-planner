@@ -4,31 +4,31 @@
     {
       "name": "_id",
       "type": "string",
-      "optional": false,
-      "keys": [
-        {
-          "type": "primary",
-          "references": ["self"]
-        }
-      ]
+      "optional": false
     },
     {
       "name": "name",
       "type": "string",
-      "optional": false,
-      "keys": []
+      "optional": false
     },
     {
       "name": "alias",
       "type": "string",
-      "optional": true,
-      "keys": []
+      "optional": true
     },
     {
       "name": "image",
       "type": "string",
-      "optional": true,
-      "keys": []
+      "optional": true
+    }
+  ],
+  "keys": [
+    {
+      "type": "primary",
+      "fields": [
+        "_id"
+      ],
+      "lookup": "pk__id.json"
     }
   ],
   "entries": [
