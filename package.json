@@ -9,6 +9,7 @@
     "dev": "gulp",
     "readme": "gulp readme",
     "sass": "gulp sass",
+    "serve:api": "node server/server.js",
     "test": "gulp testFull",
     "test:quick": "gulp testQuick",
     "watch": "gulp watchFull",
