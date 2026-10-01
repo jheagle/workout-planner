@@ -4,7 +4,8 @@
     {
       "name": "_id",
       "type": "string",
-      "optional": false
+      "optional": false,
+      "autoGenerate": true
     },
     {
       "name": "exercise_id",
