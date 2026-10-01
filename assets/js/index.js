@@ -1,4 +1,3 @@
-import { pageNavigation } from './components/templates/pageNavigation.js'
 import { musclePriorityList } from './components/templates/musclePriorityList.js'
 import { exercisePicker, wireExercisePickerEvents } from './components/templates/exercisePicker.js'
 import { lastSessionDisplay, formatLastSession } from './components/templates/lastSessionDisplay.js'
@@ -6,6 +5,8 @@ import { logWorkoutForm, wireLogWorkoutFormEvents } from './components/templates
 import { option } from './components/micro/option.js'
 import { text } from './components/micro/text.js'
 import { main } from './components/micro/main.js'
+import { header } from './components/micro/header.js'
+import { heading } from './components/micro/heading.js'
 
 window.jsonDom = jsonDom
 
@@ -97,7 +98,7 @@ const onMuscleChange = (muscleId) => {
 }
 
 const renderPage = (priorityRows) => {
-  const mainHeader = pageNavigation()
+  const mainHeader = header([heading(1, [text('Workout Planner')])])
   const priorityTable = musclePriorityList(priorityRows)
   picker = exercisePicker(priorityRows)
   lastSessionItem = lastSessionDisplay(null)
@@ -107,7 +108,7 @@ const renderPage = (priorityRows) => {
 
   documentItem.head.children.push(priorityTable.style)
 
-  // Add the menu as the first child of body
+  // Add the header as the first child of body
   documentItem.body.children.unshift(mainHeader)
 
   const mainContent = main([priorityTable.table, picker.container, lastSessionItem, logForm.container])
