@@ -51,7 +51,7 @@
   "dependencies": {
     "browser-or-node": "^3.0.0",
     "json-dom": "github:jheagle/JSON-DOM",
-    "json-fs-query": "^1.0.3",
+    "json-fs-query": "^1.0.4",
     "matrix-dom": "github:jheagle/matrix-DOM",
     "si-funciona": "^2.2.16"
   }

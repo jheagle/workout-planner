@@ -16,8 +16,18 @@ const API_BASE = 'http://localhost:3001'
 let picker
 let lastSessionItem
 let logForm
+let lastSessionId = null
+
+const fillFormFrom = (session) => {
+  logForm.weightEffortInput.element.value = session ? session.weight_effort || '' : ''
+  logForm.setsInput.element.value = session ? session.sets : ''
+  logForm.repsInput.element.value = session ? session.reps : ''
+  logForm.noteInput.element.value = session ? session.note || '' : ''
+}
 
 const updateLastSession = (session) => {
+  lastSessionId = session ? session._id : null
+  fillFormFrom(session)
   lastSessionItem.children = [text(formatLastSession(session))]
   jsonDom.updateChildNodes(lastSessionItem)
 }
@@ -48,6 +58,20 @@ const onLogWorkout = ({ weightEffort, sets, reps, note, date }) => {
       note,
       date
     })
+  })
+    .then((response) => response.json())
+    .then(() => onExerciseChange(exerciseId))
+}
+
+const onUpdateWorkout = ({ weightEffort, sets, reps, note }) => {
+  if (!lastSessionId) {
+    return
+  }
+  const exerciseId = picker.exerciseSelect.element.value
+  fetch(`${API_BASE}/api/workouts/${lastSessionId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ weightEffort, sets: sets || 0, reps: reps || 0, note })
   })
     .then((response) => response.json())
     .then(() => onExerciseChange(exerciseId))
@@ -105,7 +129,7 @@ const renderPage = (priorityRows) => {
   // documentItem - fullAddEventListener needs both, so event wiring has to happen after this.
   jsonDom.setParentItemReferences(documentItem)
   wireExercisePickerEvents(picker, onMuscleChange, onExerciseChange)
-  wireLogWorkoutFormEvents(logForm, onLogWorkout)
+  wireLogWorkoutFormEvents(logForm, onLogWorkout, onUpdateWorkout)
 
   if (priorityRows.length) {
     onMuscleChange(String(priorityRows[0].muscleId))
