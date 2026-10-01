@@ -2,6 +2,7 @@ import { musclePriorityList } from './components/templates/musclePriorityList.js
 import { exercisePicker, wireExercisePickerEvents } from './components/templates/exercisePicker.js'
 import { lastSessionDisplay, formatLastSession } from './components/templates/lastSessionDisplay.js'
 import { logWorkoutForm, wireLogWorkoutFormEvents } from './components/templates/logWorkoutForm.js'
+import { addExerciseForm, wireAddExerciseFormEvents } from './components/templates/addExerciseForm.js'
 import { option } from './components/micro/option.js'
 import { text } from './components/micro/text.js'
 import { main } from './components/micro/main.js'
@@ -17,6 +18,7 @@ const API_BASE = 'http://localhost:3001'
 let picker
 let lastSessionItem
 let logForm
+let addForm
 let lastSessionId = null
 
 const fillFormFrom = (session) => {
@@ -78,6 +80,30 @@ const onUpdateWorkout = ({ weightEffort, sets, reps, note }) => {
     .then(() => onExerciseChange(exerciseId))
 }
 
+const onAddExercise = ({ name, description, primaryMuscleIds, secondaryMuscleIds }) => {
+  if (!name) {
+    return
+  }
+  const muscleAssignments = [
+    ...primaryMuscleIds.map((muscleId) => ({ muscleId, rank: 100 })),
+    ...secondaryMuscleIds.map((muscleId) => ({ muscleId, rank: 50 }))
+  ]
+  fetch(`${API_BASE}/api/exercises`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, description, muscleAssignments })
+  })
+    .then((response) => response.json())
+    .then(() => {
+      addForm.nameInput.element.value = ''
+      addForm.descriptionInput.element.value = ''
+      Array.from(addForm.primaryMusclesSelect.element.options).forEach((opt) => { opt.selected = false })
+      Array.from(addForm.secondaryMusclesSelect.element.options).forEach((opt) => { opt.selected = false })
+      // The new exercise may apply to whichever muscle is currently selected - refresh its list.
+      onMuscleChange(picker.muscleSelect.element.value)
+    })
+}
+
 const onMuscleChange = (muscleId) => {
   fetch(`${API_BASE}/api/exercises-for-muscle?muscleId=${muscleId}`)
     .then((response) => response.json())
@@ -103,6 +129,7 @@ const renderPage = (priorityRows) => {
   picker = exercisePicker(priorityRows)
   lastSessionItem = lastSessionDisplay(null)
   logForm = logWorkoutForm()
+  addForm = addExerciseForm(priorityRows)
   const documentItem = jsonDom.documentItem
   jsonDom.updateDomItems(documentItem)
 
@@ -111,7 +138,13 @@ const renderPage = (priorityRows) => {
   // Add the header as the first child of body
   documentItem.body.children.unshift(mainHeader)
 
-  const mainContent = main([priorityTable.table, picker.container, lastSessionItem, logForm.container])
+  const mainContent = main([
+    priorityTable.table,
+    picker.container,
+    lastSessionItem,
+    logForm.container,
+    addForm.container
+  ])
 
   documentItem.body.children.push(mainContent)
 
@@ -131,6 +164,7 @@ const renderPage = (priorityRows) => {
   jsonDom.setParentItemReferences(documentItem)
   wireExercisePickerEvents(picker, onMuscleChange, onExerciseChange)
   wireLogWorkoutFormEvents(logForm, onLogWorkout, onUpdateWorkout)
+  wireAddExerciseFormEvents(addForm, onAddExercise)
 
   if (priorityRows.length) {
     onMuscleChange(String(priorityRows[0].muscleId))
