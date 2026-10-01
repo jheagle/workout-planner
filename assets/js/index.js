@@ -2,6 +2,7 @@ import { pageNavigation } from './components/templates/pageNavigation.js'
 import { musclePriorityList } from './components/templates/musclePriorityList.js'
 import { exercisePicker, wireExercisePickerEvents } from './components/templates/exercisePicker.js'
 import { lastSessionDisplay, formatLastSession } from './components/templates/lastSessionDisplay.js'
+import { logWorkoutForm, wireLogWorkoutFormEvents } from './components/templates/logWorkoutForm.js'
 import { option } from './components/micro/option.js'
 import { text } from './components/micro/text.js'
 import { main } from './components/micro/main.js'
@@ -14,6 +15,7 @@ const API_BASE = 'http://localhost:3001'
 
 let picker
 let lastSessionItem
+let logForm
 
 const updateLastSession = (session) => {
   lastSessionItem.children = [text(formatLastSession(session))]
@@ -28,6 +30,27 @@ const onExerciseChange = (exerciseId) => {
   fetch(`${API_BASE}/api/last-session?exerciseId=${exerciseId}`)
     .then((response) => response.json())
     .then(updateLastSession)
+}
+
+const onLogWorkout = ({ weightEffort, sets, reps, note, date }) => {
+  const exerciseId = picker.exerciseSelect.element.value
+  if (!exerciseId) {
+    return
+  }
+  fetch(`${API_BASE}/api/workouts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      exerciseId,
+      weightEffort,
+      sets: sets || 0,
+      reps: reps || 0,
+      note,
+      date
+    })
+  })
+    .then((response) => response.json())
+    .then(() => onExerciseChange(exerciseId))
 }
 
 const onMuscleChange = (muscleId) => {
@@ -54,6 +77,7 @@ const renderPage = (priorityRows) => {
   const priorityTable = musclePriorityList(priorityRows)
   picker = exercisePicker(priorityRows)
   lastSessionItem = lastSessionDisplay(null)
+  logForm = logWorkoutForm()
   const documentItem = jsonDom.documentItem
   jsonDom.updateDomItems(documentItem)
 
@@ -62,7 +86,7 @@ const renderPage = (priorityRows) => {
   // Add the menu as the first child of body
   documentItem.body.children.unshift(mainHeader)
 
-  const mainContent = main([priorityTable.table, picker.container, lastSessionItem])
+  const mainContent = main([priorityTable.table, picker.container, lastSessionItem, logForm.container])
 
   documentItem.body.children.push(mainContent)
 
@@ -81,6 +105,7 @@ const renderPage = (priorityRows) => {
   // documentItem - fullAddEventListener needs both, so event wiring has to happen after this.
   jsonDom.setParentItemReferences(documentItem)
   wireExercisePickerEvents(picker, onMuscleChange, onExerciseChange)
+  wireLogWorkoutFormEvents(logForm, onLogWorkout)
 
   if (priorityRows.length) {
     onMuscleChange(String(priorityRows[0].muscleId))

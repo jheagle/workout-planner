@@ -1,0 +1,54 @@
+import { div } from '../micro/div.js'
+import { input } from '../micro/input.js'
+import { button } from '../micro/button.js'
+
+const todayDate = () => new Date().toISOString().slice(0, 10)
+
+/**
+ * Builds the log-workout form's DOM structure. No event wiring here - see exercisePicker.js's
+ * own note on why that has to happen after this is attached into the real document and rendered.
+ * @returns {{ container: DomItem, weightEffortInput: DomItem, setsInput: DomItem, repsInput: DomItem, noteInput: DomItem, dateInput: DomItem, submitButton: DomItem }}
+ */
+export const logWorkoutForm = () => {
+  const weightEffortInput = input('text', { placeholder: 'Weight / effort (e.g. 120lbs)' })
+  const setsInput = input('number', { placeholder: 'Sets', min: '0' })
+  const repsInput = input('number', { placeholder: 'Reps', min: '0' })
+  const noteInput = input('text', { placeholder: 'Notes (optional)' })
+  const dateInput = input('date', { value: todayDate() })
+  const submitButton = button('Log this workout')
+
+  return {
+    container: div(
+      [weightEffortInput, setsInput, repsInput, noteInput, dateInput, submitButton],
+      'log-workout-form'
+    ),
+    weightEffortInput,
+    setsInput,
+    repsInput,
+    noteInput,
+    dateInput,
+    submitButton
+  }
+}
+
+/**
+ * Wires the form's submit button - see logWorkoutForm's own note on timing.
+ * @param {{ weightEffortInput: DomItem, setsInput: DomItem, repsInput: DomItem, noteInput: DomItem, dateInput: DomItem, submitButton: DomItem }} form
+ * @param {Function} onSubmit - ({ weightEffort, sets, reps, note, date }) => void
+ */
+export const wireLogWorkoutFormEvents = (form, onSubmit = () => {}) => {
+  jsonDom.fullAddEventListener(
+    'click',
+    () => onSubmit({
+      weightEffort: form.weightEffortInput.element.value,
+      sets: form.setsInput.element.value,
+      reps: form.repsInput.element.value,
+      note: form.noteInput.element.value,
+      date: form.dateInput.element.value
+    }),
+    'onLogWorkout',
+    null,
+    null,
+    form.submitButton
+  )
+}
