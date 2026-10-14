@@ -2,6 +2,8 @@ import { div } from '../micro/div.js'
 import { select } from '../micro/select.js'
 import { option } from '../micro/option.js'
 
+/* global jsonDom -- loaded as a plain script in muscles.html before this native ES module runs, not an npm import */
+
 /**
  * Builds the muscle -> exercise picker's DOM structure. No event wiring here - fullAddEventListener
  * needs a complete parentItem chain up to the real document root (it throws otherwise), which a

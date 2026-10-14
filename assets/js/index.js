@@ -9,6 +9,7 @@ import { main } from './components/micro/main.js'
 import { header } from './components/micro/header.js'
 import { heading } from './components/micro/heading.js'
 
+/* global jsonDom -- loaded as a plain script in muscles.html before this native ES module runs, not an npm import */
 window.jsonDom = jsonDom
 
 // The query layer needs real Node filesystem access, which this page's own JS never has - see

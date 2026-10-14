@@ -1,20 +1,20 @@
 /**
  * @jest-environment node
  */
-import { testHelpers } from 'js-build-tools/testHelpers'
+import { setUp } from 'test-filesystem'
 import { configure } from '../assets/js/data/index.js'
 import { copyDatabase } from '../assets/js/data/copyDatabase.js'
 import { createApp } from './server.js'
 
 const databasePath = 'server-test-database/'
 configure({ databasePath })
-testHelpers.setDefaults(databasePath)
+setUp.setDefaults(databasePath)
 
 let server
 let baseUrl
 
 beforeEach(async () => {
-  await testHelpers.beforeEach()
+  await setUp.beforeEach()
   await copyDatabase(databasePath)
   server = createApp()
   await new Promise(resolve => server.listen(0, resolve))
@@ -23,7 +23,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await new Promise(resolve => server.close(resolve))
-  await testHelpers.afterEach()
+  await setUp.afterEach()
 })
 
 describe('workout-planner API', () => {

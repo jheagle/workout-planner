@@ -13,12 +13,12 @@ describe('data', () => {
   })
 
   test('query() resolves workouts to their exercise and muscles via joins', async () => {
-    const queryString = 'read workouts.muscles'
-      + ' on workouts.exercise_id = exercises._id'
-      + ' and on exercises._id = exercise_muscle.exercise_id'
-      + ' and on exercise_muscle.muscle_id = muscles._id'
-      + ' merge muscles._id with exercise_muscle.muscle_id'
-      + " where date = '2024-06-02'"
+    const queryString = 'read workouts.muscles' +
+      ' on workouts.exercise_id = exercises._id' +
+      ' and on exercises._id = exercise_muscle.exercise_id' +
+      ' and on exercise_muscle.muscle_id = muscles._id' +
+      ' merge muscles._id with exercise_muscle.muscle_id' +
+      " where date = '2024-06-02'"
     const [rows] = await query(queryString)
     const benchPressRow = rows.find(row => row.order === 0)
     expect(benchPressRow.muscles).toHaveLength(1)

@@ -2,6 +2,8 @@ import { div } from '../micro/div.js'
 import { input } from '../micro/input.js'
 import { button } from '../micro/button.js'
 
+/* global jsonDom -- loaded as a plain script in muscles.html before this native ES module runs, not an npm import */
+
 const todayDate = () => new Date().toISOString().slice(0, 10)
 
 /**
