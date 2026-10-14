@@ -1,7 +1,7 @@
 /**
  * @jest-environment node
  */
-import { testHelpers } from 'js-build-tools/testHelpers'
+import { setUp } from 'test-filesystem'
 import { configure } from './index.js'
 import { copyDatabase } from './copyDatabase.js'
 import {
@@ -15,10 +15,10 @@ import {
 
 const databasePath = 'workout-queries-test-database/'
 configure({ databasePath })
-testHelpers.setDefaults(databasePath)
+setUp.setDefaults(databasePath)
 
-beforeEach(() => testHelpers.beforeEach().then(() => copyDatabase(databasePath)))
-afterEach(testHelpers.afterEach)
+beforeEach(() => setUp.beforeEach().then(() => copyDatabase(databasePath)))
+afterEach(setUp.afterEach)
 
 describe('workoutQueries', () => {
   test('getMusclePriority wires up against the real database, same as the dedicated integration test', async () => {

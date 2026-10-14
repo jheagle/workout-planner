@@ -6,11 +6,11 @@ describe('musclePriority against the real database/', () => {
     expect(await describeEntities()).toEqual(['exercise_muscle.json', 'exercises.json', 'muscles.json', 'workouts.json'])
 
     const [muscles] = await query('read muscles')
-    const queryString = 'read workouts.muscles'
-      + ' on workouts.exercise_id = exercises._id'
-      + ' and on exercises._id = exercise_muscle.exercise_id'
-      + ' and on exercise_muscle.muscle_id = muscles._id'
-      + ' merge muscles._id with exercise_muscle.muscle_id'
+    const queryString = 'read workouts.muscles' +
+      ' on workouts.exercise_id = exercises._id' +
+      ' and on exercises._id = exercise_muscle.exercise_id' +
+      ' and on exercise_muscle.muscle_id = muscles._id' +
+      ' merge muscles._id with exercise_muscle.muscle_id'
     const [workoutsWithMuscles] = await query(queryString)
 
     // 3 days after the real seed data's most recent workout (2024-06-05)

@@ -45,14 +45,14 @@
     "@babel/preset-env": "^7.29.7",
     "gulp": "^5.0.1",
     "gulp-imagemin": "github:jheagle/gulp-imagemin#common-js-compatibility",
-    "js-build-tools": "^5.0.0",
-    "test-filesystem": "^1.5.1"
+    "js-build-tools": "^6.1.0",
+    "test-filesystem": "^2.0.0"
   },
   "dependencies": {
     "browser-or-node": "^3.0.0",
     "json-dom": "github:jheagle/JSON-DOM",
-    "json-fs-query": "^1.0.4",
+    "json-fs-query": "^1.0.5",
     "matrix-dom": "github:jheagle/matrix-DOM",
-    "si-funciona": "^2.2.16"
+    "si-funciona": "^2.7.3"
   }
 }

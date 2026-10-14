@@ -11,11 +11,11 @@ const escapeQuoted = (value = '') => String(value).replace(/'/g, '')
  */
 export const getMusclePriority = async (today = new Date()) => {
   const [muscles] = await query('read muscles')
-  const joinQueryString = 'read workouts.muscles'
-    + ' on workouts.exercise_id = exercises._id'
-    + ' and on exercises._id = exercise_muscle.exercise_id'
-    + ' and on exercise_muscle.muscle_id = muscles._id'
-    + ' merge muscles._id with exercise_muscle.muscle_id'
+  const joinQueryString = 'read workouts.muscles' +
+    ' on workouts.exercise_id = exercises._id' +
+    ' and on exercises._id = exercise_muscle.exercise_id' +
+    ' and on exercise_muscle.muscle_id = muscles._id' +
+    ' merge muscles._id with exercise_muscle.muscle_id'
   const [workoutsWithMuscles] = await query(joinQueryString)
   return musclePriority(muscles, workoutsWithMuscles, today)
 }
@@ -25,9 +25,9 @@ export const getMusclePriority = async (today = new Date()) => {
  * @param muscleId
  */
 export const getExercisesForMuscle = async (muscleId) => {
-  const queryString = 'read exercise_muscle.exercises'
-    + ' on exercise_muscle.exercise_id = exercises._id'
-    + ` where muscle_id = ${muscleId}`
+  const queryString = 'read exercise_muscle.exercises' +
+    ' on exercise_muscle.exercise_id = exercises._id' +
+    ` where muscle_id = ${muscleId}`
   const [rows] = await query(queryString)
   return rows.map(row => row.exercises[0])
 }
@@ -61,14 +61,14 @@ export const logWorkout = async ({
   date = new Date().toISOString().slice(0, 10),
   order = 0
 }) => {
-  const queryString = 'insert workouts values '
-    + `exercise_id = ${exerciseId}, `
-    + `weight_effort = '${escapeQuoted(weightEffort)}', `
-    + `sets = ${sets}, `
-    + `reps = ${reps}, `
-    + `note = '${escapeQuoted(note)}', `
-    + `order = ${order}, `
-    + `date = '${date}'`
+  const queryString = 'insert workouts values ' +
+    `exercise_id = ${exerciseId}, ` +
+    `weight_effort = '${escapeQuoted(weightEffort)}', ` +
+    `sets = ${sets}, ` +
+    `reps = ${reps}, ` +
+    `note = '${escapeQuoted(note)}', ` +
+    `order = ${order}, ` +
+    `date = '${date}'`
   const [rows] = await query(queryString)
   return rows[0]
 }
@@ -107,16 +107,16 @@ export const updateWorkout = async (workoutId, { weightEffort, sets, reps, note 
  * @param muscleAssignments - [{ muscleId, rank }], one row per muscle this exercise works
  */
 export const addExercise = async ({ name, description = '' }, muscleAssignments = []) => {
-  const insertExerciseQuery = 'insert exercises values '
-    + `name = '${escapeQuoted(name)}', `
-    + `description = '${escapeQuoted(description)}'`
+  const insertExerciseQuery = 'insert exercises values ' +
+    `name = '${escapeQuoted(name)}', ` +
+    `description = '${escapeQuoted(description)}'`
   const [exerciseRows] = await query(insertExerciseQuery)
   const exercise = exerciseRows[0]
   for (const { muscleId, rank } of muscleAssignments) {
-    const insertLinkQuery = 'insert exercise_muscle values '
-      + `exercise_id = '${exercise._id}', `
-      + `muscle_id = ${muscleId}, `
-      + `muscle_rank = ${rank}`
+    const insertLinkQuery = 'insert exercise_muscle values ' +
+      `exercise_id = '${exercise._id}', ` +
+      `muscle_id = ${muscleId}, ` +
+      `muscle_rank = ${rank}`
     await query(insertLinkQuery)
   }
   return exercise
