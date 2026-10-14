@@ -54,5 +54,10 @@
     "json-fs-query": "^1.0.5",
     "matrix-dom": "github:jheagle/matrix-DOM",
     "si-funciona": "^2.7.3"
+  },
+  "standard": {
+    "env": [
+      "jest"
+    ]
   }
 }

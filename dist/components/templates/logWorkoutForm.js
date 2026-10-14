@@ -11,6 +11,8 @@ require("core-js/modules/es.date.to-string.js");
 var _div = require("../micro/div.js");
 var _input = require("../micro/input.js");
 var _button = require("../micro/button.js");
+/* global jsonDom -- loaded as a plain script in muscles.html before this native ES module runs, not an npm import */
+
 var todayDate = function todayDate() {
   return new Date().toISOString().slice(0, 10);
 };

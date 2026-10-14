@@ -17,6 +17,8 @@ var _input = require("../micro/input.js");
 var _select = require("../micro/select.js");
 var _option = require("../micro/option.js");
 var _button = require("../micro/button.js");
+/* global jsonDom -- loaded as a plain script in muscles.html before this native ES module runs, not an npm import */
+
 /**
  * Builds the add-exercise form's DOM structure. No event wiring here - see exercisePicker.js's
  * own note on why that has to happen after this is attached into the real document and rendered.

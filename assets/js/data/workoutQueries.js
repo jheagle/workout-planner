@@ -104,7 +104,7 @@ export const updateWorkout = async (workoutId, { weightEffort, sets, reps, note 
  * Add a new exercise, with the muscles it works (primary/secondary, by whatever rank you give).
  * @param name
  * @param description
- * @param muscleAssignments - [{ muscleId, rank }], one row per muscle this exercise works
+ * @param {Array<{muscleId: number, rank: number}>} muscleAssignments - one row per muscle this exercise works
  */
 export const addExercise = async ({ name, description = '' }, muscleAssignments = []) => {
   const insertExerciseQuery = 'insert exercises values ' +

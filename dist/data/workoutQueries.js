@@ -243,7 +243,7 @@ var updateWorkout = exports.updateWorkout = /*#__PURE__*/function () {
  * Add a new exercise, with the muscles it works (primary/secondary, by whatever rank you give).
  * @param name
  * @param description
- * @param muscleAssignments - [{ muscleId, rank }], one row per muscle this exercise works
+ * @param {Array<{muscleId: number, rank: number}>} muscleAssignments - one row per muscle this exercise works
  */
 var addExercise = exports.addExercise = /*#__PURE__*/function () {
   var _ref9 = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee6(_ref8) {

@@ -13,6 +13,8 @@ require("core-js/modules/esnext.iterator.map.js");
 var _div = require("../micro/div.js");
 var _select = require("../micro/select.js");
 var _option = require("../micro/option.js");
+/* global jsonDom -- loaded as a plain script in muscles.html before this native ES module runs, not an npm import */
+
 /**
  * Builds the muscle -> exercise picker's DOM structure. No event wiring here - fullAddEventListener
  * needs a complete parentItem chain up to the real document root (it throws otherwise), which a
