@@ -12,12 +12,13 @@ require("core-js/modules/es.object.to-string.js");
 require("core-js/modules/es.string.iterator.js");
 require("core-js/modules/esnext.iterator.constructor.js");
 require("core-js/modules/esnext.iterator.map.js");
-var _div = require("../micro/div.js");
-var _input = require("../micro/input.js");
-var _select = require("../micro/select.js");
-var _option = require("../micro/option.js");
-var _button = require("../micro/button.js");
-/* global jsonDom -- loaded as a plain script in muscles.html before this native ES module runs, not an npm import */
+/* global jsonDom, jsonDomComponents -- both loaded as plain scripts in muscles.html before this native ES module runs, not npm imports */
+var _jsonDomComponents = jsonDomComponents,
+  div = _jsonDomComponents.div,
+  input = _jsonDomComponents.input,
+  select = _jsonDomComponents.select,
+  option = _jsonDomComponents.option,
+  button = _jsonDomComponents.button;
 
 /**
  * Builds the add-exercise form's DOM structure. No event wiring here - see exercisePicker.js's
@@ -30,29 +31,29 @@ var _button = require("../micro/button.js");
  */
 var addExerciseForm = exports.addExerciseForm = function addExerciseForm() {
   var muscles = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [];
-  var nameInput = (0, _input.input)('text', {
+  var nameInput = input('text', '', null, [], undefined, {
     placeholder: 'Exercise name'
   });
-  var descriptionInput = (0, _input.input)('text', {
+  var descriptionInput = input('text', '', null, [], undefined, {
     placeholder: 'Description (optional)'
   });
   var muscleOptions = function muscleOptions() {
     return muscles.map(function (muscle) {
-      return (0, _option.option)(String(muscle.muscleId), muscle.name);
+      return option(String(muscle.muscleId), muscle.name);
     });
   };
   var selectSize = String(Math.min(muscles.length, 6) || 1);
-  var primaryMusclesSelect = (0, _select.select)(muscleOptions(), '', {
+  var primaryMusclesSelect = select(muscleOptions(), '', {
     multiple: true,
     size: selectSize
   });
-  var secondaryMusclesSelect = (0, _select.select)(muscleOptions(), '', {
+  var secondaryMusclesSelect = select(muscleOptions(), '', {
     multiple: true,
     size: selectSize
   });
-  var submitButton = (0, _button.button)('Add exercise');
+  var submitButton = button('Add exercise');
   return {
-    container: (0, _div.div)([nameInput, descriptionInput, primaryMusclesSelect, secondaryMusclesSelect, submitButton], 'add-exercise-form'),
+    container: div([nameInput, descriptionInput, primaryMusclesSelect, secondaryMusclesSelect, submitButton], 'add-exercise-form'),
     nameInput: nameInput,
     descriptionInput: descriptionInput,
     primaryMusclesSelect: primaryMusclesSelect,
