@@ -7,6 +7,12 @@
     "dist",
     "browser"
   ],
+  "docs": {
+    "enabled": true,
+    "from": "assets/js",
+    "index": "MAIN.md",
+    "to": "../joshuaheagle.local/projects/workout-planner/docs"
+  },
   "dist": {
     "main": "dist/index.js",
     "from": "assets/js/**/!(*.test).js",
