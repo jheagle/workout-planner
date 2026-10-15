@@ -3,14 +3,10 @@ import { exercisePicker, wireExercisePickerEvents } from './components/templates
 import { lastSessionDisplay, formatLastSession } from './components/templates/lastSessionDisplay.js'
 import { logWorkoutForm, wireLogWorkoutFormEvents } from './components/templates/logWorkoutForm.js'
 import { addExerciseForm, wireAddExerciseFormEvents } from './components/templates/addExerciseForm.js'
-import { option } from './components/micro/option.js'
-import { text } from './components/micro/text.js'
-import { main } from './components/micro/main.js'
-import { header } from './components/micro/header.js'
-import { heading } from './components/micro/heading.js'
 
-/* global jsonDom -- loaded as a plain script in muscles.html before this native ES module runs, not an npm import */
+/* global jsonDom, jsonDomComponents -- both loaded as plain scripts in muscles.html before this native ES module runs, not npm imports */
 window.jsonDom = jsonDom
+const { option, text, main, header, heading } = jsonDomComponents
 
 // The query layer needs real Node filesystem access, which this page's own JS never has - see
 // server/server.js, which exposes it as JSON endpoints this page talks to instead.

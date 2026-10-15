@@ -1,11 +1,5 @@
-import { table } from '../micro/table.js'
-import { tableBody } from '../micro/tableBody.js'
-import { tableData } from '../micro/tableData.js'
-import { tableHead } from '../micro/tableHead.js'
-import { tableHeading } from '../micro/tableHeading.js'
-import { tableRow } from '../micro/tableRow.js'
-import { text } from '../micro/text.js'
-import { style } from '../micro/style.js'
+/* global jsonDomComponents */
+const { table, tableBody, tableData, tableHead, tableHeading, tableRow, text, style } = jsonDomComponents
 
 const tableStyle = '/* \n' +
   'Max width before this PARTICULAR table gets nasty\n' +

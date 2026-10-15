@@ -1,8 +1,5 @@
-import { div } from '../micro/div.js'
-import { input } from '../micro/input.js'
-import { button } from '../micro/button.js'
-
-/* global jsonDom -- loaded as a plain script in muscles.html before this native ES module runs, not an npm import */
+/* global jsonDom, jsonDomComponents -- both loaded as plain scripts in muscles.html before this native ES module runs, not npm imports */
+const { div, input, button } = jsonDomComponents
 
 const todayDate = () => new Date().toISOString().slice(0, 10)
 
@@ -12,11 +9,11 @@ const todayDate = () => new Date().toISOString().slice(0, 10)
  * @returns {{ container: DomItem, weightEffortInput: DomItem, setsInput: DomItem, repsInput: DomItem, noteInput: DomItem, dateInput: DomItem, submitButton: DomItem }}
  */
 export const logWorkoutForm = () => {
-  const weightEffortInput = input('text', { placeholder: 'Weight / effort (e.g. 120lbs)' })
-  const setsInput = input('number', { placeholder: 'Sets', min: '0' })
-  const repsInput = input('number', { placeholder: 'Reps', min: '0' })
-  const noteInput = input('text', { placeholder: 'Notes (optional)' })
-  const dateInput = input('date', { value: todayDate() })
+  const weightEffortInput = input('text', '', null, [], undefined, { placeholder: 'Weight / effort (e.g. 120lbs)' })
+  const setsInput = input('number', '', null, [], undefined, { placeholder: 'Sets', min: '0' })
+  const repsInput = input('number', '', null, [], undefined, { placeholder: 'Reps', min: '0' })
+  const noteInput = input('text', '', null, [], undefined, { placeholder: 'Notes (optional)' })
+  const dateInput = input('date', '', todayDate())
   const submitButton = button('Log this workout')
   const updateButton = button('Update last entry')
 

@@ -1,10 +1,5 @@
-import { div } from '../micro/div.js'
-import { input } from '../micro/input.js'
-import { select } from '../micro/select.js'
-import { option } from '../micro/option.js'
-import { button } from '../micro/button.js'
-
-/* global jsonDom -- loaded as a plain script in muscles.html before this native ES module runs, not an npm import */
+/* global jsonDom, jsonDomComponents -- both loaded as plain scripts in muscles.html before this native ES module runs, not npm imports */
+const { div, input, select, option, button } = jsonDomComponents
 
 /**
  * Builds the add-exercise form's DOM structure. No event wiring here - see exercisePicker.js's
@@ -16,8 +11,8 @@ import { button } from '../micro/button.js'
  * @returns {{ container: DomItem, nameInput: DomItem, descriptionInput: DomItem, primaryMusclesSelect: DomItem, secondaryMusclesSelect: DomItem, submitButton: DomItem }}
  */
 export const addExerciseForm = (muscles = []) => {
-  const nameInput = input('text', { placeholder: 'Exercise name' })
-  const descriptionInput = input('text', { placeholder: 'Description (optional)' })
+  const nameInput = input('text', '', null, [], undefined, { placeholder: 'Exercise name' })
+  const descriptionInput = input('text', '', null, [], undefined, { placeholder: 'Description (optional)' })
   const muscleOptions = () => muscles.map((muscle) => option(String(muscle.muscleId), muscle.name))
   const selectSize = String(Math.min(muscles.length, 6) || 1)
   const primaryMusclesSelect = select(muscleOptions(), '', { multiple: true, size: selectSize })

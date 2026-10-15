@@ -8,11 +8,11 @@ exports.wireLogWorkoutFormEvents = exports.readFormValues = exports.logWorkoutFo
 require("core-js/modules/es.array.slice.js");
 require("core-js/modules/es.date.to-iso-string.js");
 require("core-js/modules/es.date.to-string.js");
-var _div = require("../micro/div.js");
-var _input = require("../micro/input.js");
-var _button = require("../micro/button.js");
-/* global jsonDom -- loaded as a plain script in muscles.html before this native ES module runs, not an npm import */
-
+/* global jsonDom, jsonDomComponents -- both loaded as plain scripts in muscles.html before this native ES module runs, not npm imports */
+var _jsonDomComponents = jsonDomComponents,
+  div = _jsonDomComponents.div,
+  input = _jsonDomComponents.input,
+  button = _jsonDomComponents.button;
 var todayDate = function todayDate() {
   return new Date().toISOString().slice(0, 10);
 };
@@ -23,27 +23,25 @@ var todayDate = function todayDate() {
  * @returns {{ container: DomItem, weightEffortInput: DomItem, setsInput: DomItem, repsInput: DomItem, noteInput: DomItem, dateInput: DomItem, submitButton: DomItem }}
  */
 var logWorkoutForm = exports.logWorkoutForm = function logWorkoutForm() {
-  var weightEffortInput = (0, _input.input)('text', {
+  var weightEffortInput = input('text', '', null, [], undefined, {
     placeholder: 'Weight / effort (e.g. 120lbs)'
   });
-  var setsInput = (0, _input.input)('number', {
+  var setsInput = input('number', '', null, [], undefined, {
     placeholder: 'Sets',
     min: '0'
   });
-  var repsInput = (0, _input.input)('number', {
+  var repsInput = input('number', '', null, [], undefined, {
     placeholder: 'Reps',
     min: '0'
   });
-  var noteInput = (0, _input.input)('text', {
+  var noteInput = input('text', '', null, [], undefined, {
     placeholder: 'Notes (optional)'
   });
-  var dateInput = (0, _input.input)('date', {
-    value: todayDate()
-  });
-  var submitButton = (0, _button.button)('Log this workout');
-  var updateButton = (0, _button.button)('Update last entry');
+  var dateInput = input('date', '', todayDate());
+  var submitButton = button('Log this workout');
+  var updateButton = button('Update last entry');
   return {
-    container: (0, _div.div)([weightEffortInput, setsInput, repsInput, noteInput, dateInput, submitButton, updateButton], 'log-workout-form'),
+    container: div([weightEffortInput, setsInput, repsInput, noteInput, dateInput, submitButton, updateButton], 'log-workout-form'),
     weightEffortInput: weightEffortInput,
     setsInput: setsInput,
     repsInput: repsInput,

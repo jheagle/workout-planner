@@ -1,4 +1,9 @@
-import { formatLastSession } from './lastSessionDisplay.js'
+// formatLastSession is pure, but importing this module also destructures the jsonDomComponents global at the
+// top level (for the DomItem-building lastSessionDisplay export this file doesn't test) - a lightweight stub is
+// enough, no need to load the real package. require(), not import, so this assignment actually runs first -
+// import statements are hoisted ahead of any other top-level code, which would run too late here.
+global.jsonDomComponents = { div: () => {}, text: () => {} }
+const { formatLastSession } = require('./lastSessionDisplay.js')
 
 describe('formatLastSession', () => {
   test('describes a real session with its weight, sets, reps and date', () => {

@@ -30,19 +30,20 @@ var _exercisePicker = require("./components/templates/exercisePicker.js");
 var _lastSessionDisplay = require("./components/templates/lastSessionDisplay.js");
 var _logWorkoutForm = require("./components/templates/logWorkoutForm.js");
 var _addExerciseForm = require("./components/templates/addExerciseForm.js");
-var _option = require("./components/micro/option.js");
-var _text = require("./components/micro/text.js");
-var _main = require("./components/micro/main.js");
-var _header = require("./components/micro/header.js");
-var _heading = require("./components/micro/heading.js");
 function _toConsumableArray(r) { return _arrayWithoutHoles(r) || _iterableToArray(r) || _unsupportedIterableToArray(r) || _nonIterableSpread(); }
 function _nonIterableSpread() { throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
 function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
 function _iterableToArray(r) { if ("undefined" != typeof Symbol && null != r[Symbol.iterator] || null != r["@@iterator"]) return Array.from(r); }
 function _arrayWithoutHoles(r) { if (Array.isArray(r)) return _arrayLikeToArray(r); }
 function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
-/* global jsonDom -- loaded as a plain script in muscles.html before this native ES module runs, not an npm import */
+/* global jsonDom, jsonDomComponents -- both loaded as plain scripts in muscles.html before this native ES module runs, not npm imports */
 window.jsonDom = jsonDom;
+var _jsonDomComponents = jsonDomComponents,
+  option = _jsonDomComponents.option,
+  text = _jsonDomComponents.text,
+  main = _jsonDomComponents.main,
+  header = _jsonDomComponents.header,
+  heading = _jsonDomComponents.heading;
 
 // The query layer needs real Node filesystem access, which this page's own JS never has - see
 // server/server.js, which exposes it as JSON endpoints this page talks to instead.
@@ -61,7 +62,7 @@ var fillFormFrom = function fillFormFrom(session) {
 var updateLastSession = function updateLastSession(session) {
   lastSessionId = session ? session._id : null;
   fillFormFrom(session);
-  lastSessionItem.children = [(0, _text.text)((0, _lastSessionDisplay.formatLastSession)(session))];
+  lastSessionItem.children = [text((0, _lastSessionDisplay.formatLastSession)(session))];
   jsonDom.updateChildNodes(lastSessionItem);
 };
 var onExerciseChange = function onExerciseChange(exerciseId) {
@@ -177,8 +178,8 @@ var onMuscleChange = function onMuscleChange(muscleId) {
     return response.json();
   }).then(function (exercises) {
     picker.exerciseSelect.children = exercises.length ? exercises.map(function (exercise) {
-      return (0, _option.option)(String(exercise._id), exercise.name);
-    }) : [(0, _option.option)('', 'No exercises for this muscle yet')];
+      return option(String(exercise._id), exercise.name);
+    }) : [option('', 'No exercises for this muscle yet')];
     picker.exerciseSelect.element.disabled = exercises.length === 0;
     jsonDom.updateChildNodes(picker.exerciseSelect);
     if (!exercises.length) {
@@ -191,7 +192,7 @@ var onMuscleChange = function onMuscleChange(muscleId) {
   });
 };
 var renderPage = function renderPage(priorityRows) {
-  var mainHeader = (0, _header.header)([(0, _heading.heading)(1, [(0, _text.text)('Workout Planner')])]);
+  var mainHeader = header([heading(1, [text('Workout Planner')])]);
   var priorityTable = (0, _musclePriorityList.musclePriorityList)(priorityRows);
   picker = (0, _exercisePicker.exercisePicker)(priorityRows);
   lastSessionItem = (0, _lastSessionDisplay.lastSessionDisplay)(null);
@@ -203,7 +204,7 @@ var renderPage = function renderPage(priorityRows) {
 
   // Add the header as the first child of body
   documentItem.body.children.unshift(mainHeader);
-  var mainContent = (0, _main.main)([priorityTable.table, picker.container, lastSessionItem, logForm.container, addForm.container]);
+  var mainContent = main([priorityTable.table, picker.container, lastSessionItem, logForm.container, addForm.container]);
   documentItem.body.children.push(mainContent);
 
   // Update the body child node list to include the header

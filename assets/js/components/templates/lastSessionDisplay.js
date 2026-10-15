@@ -1,5 +1,5 @@
-import { div } from '../micro/div.js'
-import { text } from '../micro/text.js'
+/* global jsonDomComponents */
+const { div, text } = jsonDomComponents
 
 export const formatLastSession = (session) => session
   ? `Last time: ${session.weight_effort || 'no weight recorded'}, ${session.sets}x${session.reps} on ${session.date}`

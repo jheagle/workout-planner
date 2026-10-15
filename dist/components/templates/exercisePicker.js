@@ -10,10 +10,11 @@ require("core-js/modules/es.function.name.js");
 require("core-js/modules/es.object.to-string.js");
 require("core-js/modules/esnext.iterator.constructor.js");
 require("core-js/modules/esnext.iterator.map.js");
-var _div = require("../micro/div.js");
-var _select = require("../micro/select.js");
-var _option = require("../micro/option.js");
-/* global jsonDom -- loaded as a plain script in muscles.html before this native ES module runs, not an npm import */
+/* global jsonDom, jsonDomComponents -- both loaded as plain scripts in muscles.html before this native ES module runs, not npm imports */
+var _jsonDomComponents = jsonDomComponents,
+  div = _jsonDomComponents.div,
+  select = _jsonDomComponents.select,
+  option = _jsonDomComponents.option;
 
 /**
  * Builds the muscle -> exercise picker's DOM structure. No event wiring here - fullAddEventListener
@@ -25,14 +26,14 @@ var _option = require("../micro/option.js");
  */
 var exercisePicker = exports.exercisePicker = function exercisePicker() {
   var priorityRows = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [];
-  var muscleSelect = (0, _select.select)(priorityRows.map(function (row) {
-    return (0, _option.option)(String(row.muscleId), row.name);
+  var muscleSelect = select(priorityRows.map(function (row) {
+    return option(String(row.muscleId), row.name);
   }));
-  var exerciseSelect = (0, _select.select)([(0, _option.option)('', 'Pick a muscle first')], '', {
+  var exerciseSelect = select([option('', 'Pick a muscle first')], '', {
     disabled: true
   });
   return {
-    container: (0, _div.div)([muscleSelect, exerciseSelect], 'exercise-picker'),
+    container: div([muscleSelect, exerciseSelect], 'exercise-picker'),
     muscleSelect: muscleSelect,
     exerciseSelect: exerciseSelect
   };
