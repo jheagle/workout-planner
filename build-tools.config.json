@@ -11,6 +11,7 @@
     "enabled": true,
     "from": "assets/js",
     "index": "MAIN.md",
+    "title": "Workout Planner",
     "to": "../joshuaheagle.local/projects/workout-planner/docs"
   },
   "dist": {
