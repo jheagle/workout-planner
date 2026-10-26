@@ -1,9 +1,5 @@
-import { query } from './index.js'
+import { query, quote } from './index.js'
 import { musclePriority } from './musclePriority.js'
-
-// These values only ever get interpolated into a query string, never executed as code - stripping
-// a stray quote is enough to keep that string's own syntax intact for this single-user, local tool.
-const escapeQuoted = (value = '') => String(value).replace(/'/g, '')
 
 /**
  * Rank every muscle by how much it needs attention right now, from a real read of the database.
@@ -63,10 +59,10 @@ export const logWorkout = async ({
 }) => {
   const queryString = 'insert workouts values ' +
     `exercise_id = ${exerciseId}, ` +
-    `weight_effort = '${escapeQuoted(weightEffort)}', ` +
+    `weight_effort = ${quote(weightEffort)}, ` +
     `sets = ${sets}, ` +
     `reps = ${reps}, ` +
-    `note = '${escapeQuoted(note)}', ` +
+    `note = ${quote(note)}, ` +
     `order = ${order}, ` +
     `date = '${date}'`
   const [rows] = await query(queryString)
@@ -81,7 +77,7 @@ export const logWorkout = async ({
 export const updateWorkout = async (workoutId, { weightEffort, sets, reps, note } = {}) => {
   const assignments = []
   if (typeof weightEffort !== 'undefined') {
-    assignments.push(`weight_effort = '${escapeQuoted(weightEffort)}'`)
+    assignments.push(`weight_effort = ${quote(weightEffort)}`)
   }
   if (typeof sets !== 'undefined') {
     assignments.push(`sets = ${sets}`)
@@ -90,7 +86,7 @@ export const updateWorkout = async (workoutId, { weightEffort, sets, reps, note 
     assignments.push(`reps = ${reps}`)
   }
   if (typeof note !== 'undefined') {
-    assignments.push(`note = '${escapeQuoted(note)}'`)
+    assignments.push(`note = ${quote(note)}`)
   }
   if (!assignments.length) {
     return null
@@ -108,8 +104,8 @@ export const updateWorkout = async (workoutId, { weightEffort, sets, reps, note 
  */
 export const addExercise = async ({ name, description = '' }, muscleAssignments = []) => {
   const insertExerciseQuery = 'insert exercises values ' +
-    `name = '${escapeQuoted(name)}', ` +
-    `description = '${escapeQuoted(description)}'`
+    `name = ${quote(name)}, ` +
+    `description = ${quote(description)}`
   const [exerciseRows] = await query(insertExerciseQuery)
   const exercise = exerciseRows[0]
   for (const { muscleId, rank } of muscleAssignments) {

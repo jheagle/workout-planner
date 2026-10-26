@@ -65,15 +65,26 @@ describe('workoutQueries', () => {
     expect(session.weight_effort).toBe('125lbs')
   })
 
-  test('logWorkout strips a stray quote out of free-text fields rather than breaking the query', async () => {
+  test('logWorkout keeps free text exactly as typed, quotes and query syntax included', async () => {
+    const note = "felt great, didn't even need a spotter; C:\\gym -- \"PR\" /* next */ [x]"
     const logged = await logWorkout({
       exerciseId: 1,
+      weightEffort: "bar + 2 25's",
       sets: 3,
       reps: 8,
-      note: "felt great, didn't even need a spotter",
+      note,
       date: '2024-06-12'
     })
-    expect(logged.note).toBe('felt great, didnt even need a spotter')
+    expect(logged.note).toBe(note)
+    expect(logged.weight_effort).toBe("bar + 2 25's")
+
+    const session = await getLastSession(1)
+    expect(session.note).toBe(note)
+  })
+
+  test('updateWorkout keeps free text exactly as typed', async () => {
+    const updated = await updateWorkout(1, { note: "spotter's call \\ last set" })
+    expect(updated.note).toBe("spotter's call \\ last set")
   })
 
   test('updateWorkout corrects an existing real entry', async () => {
@@ -95,5 +106,11 @@ describe('workoutQueries', () => {
     expect(deltoidExercises.map(row => row.name)).toContain('Overhead Press')
     const tricepExercises = await getExercisesForMuscle(14)
     expect(tricepExercises.map(row => row.name)).toContain('Overhead Press')
+  })
+
+  test('addExercise keeps an apostrophe in the name and description', async () => {
+    const exercise = await addExercise({ name: "Farmer's Walk", description: "Carry; don't drop" })
+    expect(exercise.name).toBe("Farmer's Walk")
+    expect(exercise.description).toBe("Carry; don't drop")
   })
 })
