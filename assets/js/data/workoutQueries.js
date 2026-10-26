@@ -1,5 +1,6 @@
 import { query, quote } from './index.js'
 import { musclePriority } from './musclePriority.js'
+import { localDate } from './localDate.js'
 
 /**
  * Rank every muscle by how much it needs attention right now, from a real read of the database.
@@ -45,7 +46,7 @@ export const getLastSession = async (exerciseId) => {
  * @param sets
  * @param reps
  * @param note
- * @param date - defaults to today, in the same 'YYYY-MM-DD' shape the rest of the data uses
+ * @param date - defaults to today (the local date, see localDate), in the same 'YYYY-MM-DD' shape the rest of the data uses
  * @param order - where this entry falls among others logged the same day (defaults to first)
  */
 export const logWorkout = async ({
@@ -54,7 +55,7 @@ export const logWorkout = async ({
   sets,
   reps,
   note = '',
-  date = new Date().toISOString().slice(0, 10),
+  date = localDate(),
   order = 0
 }) => {
   const queryString = 'insert workouts values ' +

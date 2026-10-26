@@ -87,6 +87,20 @@ describe('workoutQueries', () => {
     expect(updated.note).toBe("spotter's call \\ last set")
   })
 
+  test.each([
+    [0, 1],
+    [23, 59]
+  ])('logWorkout defaults to the local date at %i:%i, not the UTC one (logging at 21:30 in Toronto used to save tomorrow)', async (hours, minutes) => {
+    // Only Date is faked: the database is real files, so timers and ticks must keep running
+    jest.useFakeTimers({ now: new Date(2026, 9, 26, hours, minutes), doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask', 'hrtime', 'performance'] })
+    try {
+      const logged = await logWorkout({ exerciseId: 1, sets: 3, reps: 8 })
+      expect(logged.date).toBe('2026-10-26')
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
   test('updateWorkout corrects an existing real entry', async () => {
     const updated = await updateWorkout(1, { weightEffort: '120lbs', reps: 12 })
     expect(updated.weight_effort).toBe('120lbs')

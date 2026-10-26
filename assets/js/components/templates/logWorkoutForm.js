@@ -1,7 +1,7 @@
 /* global jsonDom, jsonDomComponents -- both loaded as plain scripts in muscles.html before this native ES module runs, not npm imports */
-const { div, input, button } = jsonDomComponents
+import { localDate } from '../../data/localDate.js'
 
-const todayDate = () => new Date().toISOString().slice(0, 10)
+const { div, input, button } = jsonDomComponents
 
 /**
  * Builds the log-workout form's DOM structure. No event wiring here - see exercisePicker.js's
@@ -13,7 +13,7 @@ export const logWorkoutForm = () => {
   const setsInput = input('number', '', null, [], undefined, { placeholder: 'Sets', min: '0' })
   const repsInput = input('number', '', null, [], undefined, { placeholder: 'Reps', min: '0' })
   const noteInput = input('text', '', null, [], undefined, { placeholder: 'Notes (optional)' })
-  const dateInput = input('date', '', todayDate())
+  const dateInput = input('date', '', localDate())
   const submitButton = button('Log this workout')
   const updateButton = button('Update last entry')
 
