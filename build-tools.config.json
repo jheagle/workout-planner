@@ -8,6 +8,7 @@
     "browser"
   ],
   "docs": {
+    "basePath": "/projects/workout-planner/docs/",
     "enabled": true,
     "from": "assets/js",
     "index": "MAIN.md",

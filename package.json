@@ -47,10 +47,10 @@
     "@babel/plugin-proposal-throw-expressions": "^7.29.7",
     "@babel/plugin-transform-modules-commonjs": "^7.29.7",
     "@babel/preset-env": "^7.29.7",
-    "clean-jsdoc-theme": "^4.3.3",
+    "clean-jsdoc-theme": "^5.2.1",
     "gulp": "^5.0.1",
     "gulp-imagemin": "github:jheagle/gulp-imagemin#common-js-compatibility",
-    "js-build-tools": "^6.4.1",
+    "js-build-tools": "^6.7.0",
     "jsdoc": "^4.0.5",
     "release-it": "^21.1.1",
     "test-filesystem": "^2.0.0"
@@ -75,6 +75,7 @@
     "@parcel/watcher": false,
     "core-js": false,
     "core-js-pure": false,
-    "unrs-resolver": false
+    "unrs-resolver": false,
+    "esbuild": false
   }
 }
