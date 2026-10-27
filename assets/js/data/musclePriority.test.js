@@ -4,7 +4,8 @@ const muscle = (id, name) => ({ _id: id, name, alias: '', image: '' })
 const workout = (date, muscles) => ({ date, muscles })
 
 describe('musclePriority', () => {
-  const today = new Date('2024-06-10T12:00:00Z')
+  // Built from local parts: only the local date of "today" counts, so this holds in any timezone
+  const today = new Date(2024, 5, 10, 12, 0)
 
   test('a muscle with no workout history at all needs priority, with no days-since value', () => {
     const [result] = musclePriority([muscle(1, 'Chest')], [], today)
@@ -62,6 +63,24 @@ describe('musclePriority', () => {
     const [result] = musclePriority([muscle(1, 'Chest')], workouts, today)
     expect(result.daysSinceLastWorked).toBeGreaterThanOrEqual(3)
     expect(result.needsPriority).toBe(true)
+  })
+
+  test('counts calendar days: late in the evening, yesterday\'s workout is 1 day ago, not 2 (dates used to be UTC midnight)', () => {
+    const lateEvening = new Date(2024, 5, 10, 23, 30)
+    const [result] = musclePriority([muscle(1, 'Chest')], [workout('2024-06-09', [muscle(1, 'Chest')])], lateEvening)
+    expect(result.daysSinceLastWorked).toBe(1)
+  })
+
+  test('counts calendar days: just after midnight, yesterday\'s workout is 1 day ago, not 0', () => {
+    const justAfterMidnight = new Date(2024, 5, 10, 0, 5)
+    const [result] = musclePriority([muscle(1, 'Chest')], [workout('2024-06-09', [muscle(1, 'Chest')])], justAfterMidnight)
+    expect(result.daysSinceLastWorked).toBe(1)
+  })
+
+  test('this week means the last 7 calendar days, today included', () => {
+    const workouts = [workout('2024-06-03', [muscle(1, 'Chest')]), workout('2024-06-02', [muscle(1, 'Chest')])]
+    const [result] = musclePriority([muscle(1, 'Chest')], workouts, new Date(2024, 5, 10, 23, 30))
+    expect(result.timesWorkedThisWeek).toBe(1)
   })
 
   test('one workout can carry multiple muscles (a compound exercise), crediting all of them', () => {

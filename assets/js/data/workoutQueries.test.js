@@ -22,7 +22,7 @@ afterEach(setUp.afterEach)
 
 describe('workoutQueries', () => {
   test('getMusclePriority wires up against the real database, same as the dedicated integration test', async () => {
-    const result = await getMusclePriority(new Date('2024-06-08T00:00:00Z'))
+    const result = await getMusclePriority(new Date(2024, 5, 8))
     expect(result).toHaveLength(14)
     expect(result.find(row => row.name === 'Pectorals').timesWorkedThisWeek).toBe(2)
   })
