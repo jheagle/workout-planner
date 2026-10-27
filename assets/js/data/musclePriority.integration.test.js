@@ -14,7 +14,7 @@ describe('musclePriority against the real database/', () => {
     const [workoutsWithMuscles] = await query(queryString)
 
     // 3 days after the real seed data's most recent workout (2024-06-05)
-    const today = new Date('2024-06-08T00:00:00Z')
+    const today = new Date(2024, 5, 8) // local midnight: only the local date counts
     const result = musclePriority(muscles, workoutsWithMuscles, today)
 
     expect(result).toHaveLength(14)

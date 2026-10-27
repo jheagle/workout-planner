@@ -1,6 +1,19 @@
+import { localDate } from './localDate.js'
+
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000
 const RECOVERY_DAYS = 3 // a muscle is considered recovered 72 hours after it was last worked
 const TARGET_TIMES_PER_WEEK = 2 // strength goal: work each muscle at least this many distinct days per week
+
+/**
+ * A 'YYYY-MM-DD' date as a whole day number, so two dates are compared as calendar days, never as moments: a
+ * workout's date has no time of day, and new Date('YYYY-MM-DD') is midnight UTC, which in the evening west of UTC
+ * is already more than a day before the local "now" (21:30 in Toronto counted yesterday's workout as 2 days ago).
+ * @param date
+ */
+const dayNumber = (date) => {
+  const [year, month, day] = date.split('-').map(Number)
+  return Date.UTC(year, month - 1, day) / MILLISECONDS_PER_DAY
+}
 
 /**
  * Rank muscles by how much they need attention right now, from a real read of the database:
@@ -11,7 +24,7 @@ const TARGET_TIMES_PER_WEEK = 2 // strength goal: work each muscle at least this
  * @param muscles - every row from `read muscles`
  * @param workoutsWithMuscles - every row from the workouts-joined-to-muscles query, each carrying
  * a `.muscles` array (the muscles that workout's exercise worked)
- * @param today - injectable for testing; defaults to the real current time
+ * @param today - injectable for testing; defaults to the real current time (only its local date counts)
  */
 export const musclePriority = (muscles = [], workoutsWithMuscles = [], today = new Date()) => {
   const stats = {}
@@ -19,16 +32,17 @@ export const musclePriority = (muscles = [], workoutsWithMuscles = [], today = n
     stats[muscle._id] = { muscle, lastWorkedDate: null, datesThisWeek: new Set() }
   })
 
-  const weekAgo = new Date(today.getTime() - 7 * MILLISECONDS_PER_DAY)
+  const todayNumber = dayNumber(localDate(today))
+  const weekAgo = todayNumber - 7
 
   workoutsWithMuscles.forEach(workout => {
-    const workoutDate = new Date(workout.date)
+    const workoutDate = dayNumber(workout.date)
     ;(workout.muscles || []).forEach(muscle => {
       const stat = stats[muscle._id]
       if (!stat) {
         return
       }
-      if (!stat.lastWorkedDate || workoutDate > stat.lastWorkedDate) {
+      if (stat.lastWorkedDate === null || workoutDate > stat.lastWorkedDate) {
         stat.lastWorkedDate = workoutDate
       }
       if (workoutDate >= weekAgo) {
@@ -39,8 +53,8 @@ export const musclePriority = (muscles = [], workoutsWithMuscles = [], today = n
 
   return Object.values(stats)
     .map(({ muscle, lastWorkedDate, datesThisWeek }) => {
-      const daysSinceLastWorked = lastWorkedDate
-        ? Math.floor((today.getTime() - lastWorkedDate.getTime()) / MILLISECONDS_PER_DAY)
+      const daysSinceLastWorked = lastWorkedDate !== null
+        ? todayNumber - lastWorkedDate
         : Infinity
       const timesWorkedThisWeek = datesThisWeek.size
       return {
