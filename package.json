@@ -59,7 +59,7 @@
     "browser-or-node": "^3.0.0",
     "json-dom": "github:jheagle/JSON-DOM",
     "json-dom-components": "github:jheagle/json-dom-components",
-    "json-fs-query": "^2.2.1",
+    "json-fs-query": "^2.3.0",
     "matrix-dom": "github:jheagle/matrix-DOM",
     "si-funciona": "^2.7.3"
   },
