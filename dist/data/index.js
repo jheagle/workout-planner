@@ -40,6 +40,12 @@ Object.defineProperty(exports, "query", {
     return _jsonFsQuery.query;
   }
 });
+Object.defineProperty(exports, "quote", {
+  enumerable: true,
+  get: function get() {
+    return _jsonFsQuery.quote;
+  }
+});
 var _jsonFsQuery = require("json-fs-query");
 (0, _jsonFsQuery.configure)({
   databasePath: 'database/'

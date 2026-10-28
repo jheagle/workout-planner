@@ -5,17 +5,13 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 exports.wireLogWorkoutFormEvents = exports.readFormValues = exports.logWorkoutForm = void 0;
-require("core-js/modules/es.array.slice.js");
-require("core-js/modules/es.date.to-iso-string.js");
-require("core-js/modules/es.date.to-string.js");
+var _localDate = require("../../data/localDate.js");
 /* global jsonDom, jsonDomComponents -- both loaded as plain scripts in muscles.html before this native ES module runs, not npm imports */
+
 var _jsonDomComponents = jsonDomComponents,
   div = _jsonDomComponents.div,
   input = _jsonDomComponents.input,
   button = _jsonDomComponents.button;
-var todayDate = function todayDate() {
-  return new Date().toISOString().slice(0, 10);
-};
 
 /**
  * Builds the log-workout form's DOM structure. No event wiring here - see exercisePicker.js's
@@ -37,7 +33,7 @@ var logWorkoutForm = exports.logWorkoutForm = function logWorkoutForm() {
   var noteInput = input('text', '', null, [], undefined, {
     placeholder: 'Notes (optional)'
   });
-  var dateInput = input('date', '', todayDate());
+  var dateInput = input('date', '', (0, _localDate.localDate)());
   var submitButton = button('Log this workout');
   var updateButton = button('Update last entry');
   return {
