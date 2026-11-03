@@ -1,8 +1,5 @@
 "use strict";
 
-require("core-js/modules/es.object.define-property.js");
-require("core-js/modules/es.object.to-string.js");
-require("core-js/modules/es.promise.js");
 require("core-js/modules/esnext.async-iterator.constructor.js");
 require("core-js/modules/esnext.async-iterator.drop.js");
 require("core-js/modules/esnext.iterator.constructor.js");
@@ -12,37 +9,37 @@ Object.defineProperty(exports, "__esModule", {
 });
 Object.defineProperty(exports, "configure", {
   enumerable: true,
-  get: function get() {
+  get: function () {
     return _jsonFsQuery.configure;
   }
 });
 Object.defineProperty(exports, "create", {
   enumerable: true,
-  get: function get() {
+  get: function () {
     return _jsonFsQuery.create;
   }
 });
 Object.defineProperty(exports, "describe", {
   enumerable: true,
-  get: function get() {
+  get: function () {
     return _jsonFsQuery.describe;
   }
 });
 Object.defineProperty(exports, "drop", {
   enumerable: true,
-  get: function get() {
+  get: function () {
     return _jsonFsQuery.drop;
   }
 });
 Object.defineProperty(exports, "query", {
   enumerable: true,
-  get: function get() {
+  get: function () {
     return _jsonFsQuery.query;
   }
 });
 Object.defineProperty(exports, "quote", {
   enumerable: true,
-  get: function get() {
+  get: function () {
     return _jsonFsQuery.quote;
   }
 });

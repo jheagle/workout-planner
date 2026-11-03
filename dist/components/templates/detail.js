@@ -1,6 +1,5 @@
 "use strict";
 
-require("core-js/modules/es.object.define-property.js");
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
@@ -10,6 +9,5 @@ exports.detail = void 0;
  * @param {number} currentIndex
  * @returns {DomItem}
  */
-var detail = exports.detail = function detail() {
-  var currentIndex = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 1;
-};
+const detail = (currentIndex = 1) => {};
+exports.detail = detail;

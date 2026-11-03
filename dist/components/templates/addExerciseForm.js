@@ -1,24 +1,19 @@
 "use strict";
 
-require("core-js/modules/es.object.define-property.js");
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
 exports.wireAddExerciseFormEvents = exports.readAddExerciseValues = exports.addExerciseForm = void 0;
-require("core-js/modules/es.array.from.js");
-require("core-js/modules/es.array.map.js");
-require("core-js/modules/es.function.name.js");
-require("core-js/modules/es.object.to-string.js");
-require("core-js/modules/es.string.iterator.js");
 require("core-js/modules/esnext.iterator.constructor.js");
 require("core-js/modules/esnext.iterator.map.js");
 /* global jsonDom, jsonDomComponents -- both loaded as plain scripts in muscles.html before this native ES module runs, not npm imports */
-var _jsonDomComponents = jsonDomComponents,
-  div = _jsonDomComponents.div,
-  input = _jsonDomComponents.input,
-  select = _jsonDomComponents.select,
-  option = _jsonDomComponents.option,
-  button = _jsonDomComponents.button;
+const {
+  div,
+  input,
+  select,
+  option,
+  button
+} = jsonDomComponents;
 
 /**
  * Builds the add-exercise form's DOM structure. No event wiring here - see exercisePicker.js's
@@ -29,60 +24,49 @@ var _jsonDomComponents = jsonDomComponents,
  * @param {Array} muscles - musclePriority()'s shape (every real muscle, not just priority ones) - becomes both selects' options
  * @returns {{ container: DomItem, nameInput: DomItem, descriptionInput: DomItem, primaryMusclesSelect: DomItem, secondaryMusclesSelect: DomItem, submitButton: DomItem }}
  */
-var addExerciseForm = exports.addExerciseForm = function addExerciseForm() {
-  var muscles = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [];
-  var nameInput = input('text', '', null, [], undefined, {
+const addExerciseForm = (muscles = []) => {
+  const nameInput = input('text', '', null, [], undefined, {
     placeholder: 'Exercise name'
   });
-  var descriptionInput = input('text', '', null, [], undefined, {
+  const descriptionInput = input('text', '', null, [], undefined, {
     placeholder: 'Description (optional)'
   });
-  var muscleOptions = function muscleOptions() {
-    return muscles.map(function (muscle) {
-      return option(String(muscle.muscleId), muscle.name);
-    });
-  };
-  var selectSize = String(Math.min(muscles.length, 6) || 1);
-  var primaryMusclesSelect = select(muscleOptions(), '', {
+  const muscleOptions = () => muscles.map(muscle => option(String(muscle.muscleId), muscle.name));
+  const selectSize = String(Math.min(muscles.length, 6) || 1);
+  const primaryMusclesSelect = select(muscleOptions(), '', {
     multiple: true,
     size: selectSize
   });
-  var secondaryMusclesSelect = select(muscleOptions(), '', {
+  const secondaryMusclesSelect = select(muscleOptions(), '', {
     multiple: true,
     size: selectSize
   });
-  var submitButton = button('Add exercise');
+  const submitButton = button('Add exercise');
   return {
     container: div([nameInput, descriptionInput, primaryMusclesSelect, secondaryMusclesSelect, submitButton], 'add-exercise-form'),
-    nameInput: nameInput,
-    descriptionInput: descriptionInput,
-    primaryMusclesSelect: primaryMusclesSelect,
-    secondaryMusclesSelect: secondaryMusclesSelect,
-    submitButton: submitButton
+    nameInput,
+    descriptionInput,
+    primaryMusclesSelect,
+    secondaryMusclesSelect,
+    submitButton
   };
 };
-var selectedValues = function selectedValues(selectItem) {
-  return Array.from(selectItem.element.selectedOptions).map(function (option) {
-    return option.value;
-  });
-};
-var readAddExerciseValues = exports.readAddExerciseValues = function readAddExerciseValues(form) {
-  return {
-    name: form.nameInput.element.value,
-    description: form.descriptionInput.element.value,
-    primaryMuscleIds: selectedValues(form.primaryMusclesSelect),
-    secondaryMuscleIds: selectedValues(form.secondaryMusclesSelect)
-  };
-};
+exports.addExerciseForm = addExerciseForm;
+const selectedValues = selectItem => Array.from(selectItem.element.selectedOptions).map(option => option.value);
+const readAddExerciseValues = form => ({
+  name: form.nameInput.element.value,
+  description: form.descriptionInput.element.value,
+  primaryMuscleIds: selectedValues(form.primaryMusclesSelect),
+  secondaryMuscleIds: selectedValues(form.secondaryMusclesSelect)
+});
 
 /**
  * Wires the form's submit button - see addExerciseForm's own note on timing.
  * @param {{ nameInput: DomItem, descriptionInput: DomItem, primaryMusclesSelect: DomItem, secondaryMusclesSelect: DomItem, submitButton: DomItem }} form
  * @param {Function} onSubmit - ({ name, description, primaryMuscleIds, secondaryMuscleIds }) => void
  */
-var wireAddExerciseFormEvents = exports.wireAddExerciseFormEvents = function wireAddExerciseFormEvents(form) {
-  var onSubmit = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : function () {};
-  jsonDom.fullAddEventListener('click', function () {
-    return onSubmit(readAddExerciseValues(form));
-  }, 'onAddExercise', null, null, form.submitButton);
+exports.readAddExerciseValues = readAddExerciseValues;
+const wireAddExerciseFormEvents = (form, onSubmit = () => {}) => {
+  jsonDom.fullAddEventListener('click', () => onSubmit(readAddExerciseValues(form)), 'onAddExercise', null, null, form.submitButton);
 };
+exports.wireAddExerciseFormEvents = wireAddExerciseFormEvents;
