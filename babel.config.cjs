@@ -1,12 +1,3 @@
-module.exports = {
-  plugins: [
-    '@babel/plugin-proposal-throw-expressions',
-    '@babel/plugin-transform-modules-commonjs'
-  ],
-  presets: [
-    ['@babel/preset-env', {
-      useBuiltIns: 'usage',
-      corejs: { version: '3.6', proposals: true }
-    }]
-  ]
-}
+const babelConfig = require('js-build-tools/babel.config')
+babelConfig.plugins.push(require.resolve('@babel/plugin-proposal-throw-expressions'))
+module.exports = babelConfig

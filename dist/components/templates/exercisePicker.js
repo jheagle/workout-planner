@@ -1,20 +1,17 @@
 "use strict";
 
-require("core-js/modules/es.object.define-property.js");
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
 exports.wireExercisePickerEvents = exports.exercisePicker = void 0;
-require("core-js/modules/es.array.map.js");
-require("core-js/modules/es.function.name.js");
-require("core-js/modules/es.object.to-string.js");
 require("core-js/modules/esnext.iterator.constructor.js");
 require("core-js/modules/esnext.iterator.map.js");
 /* global jsonDom, jsonDomComponents -- both loaded as plain scripts in muscles.html before this native ES module runs, not npm imports */
-var _jsonDomComponents = jsonDomComponents,
-  div = _jsonDomComponents.div,
-  select = _jsonDomComponents.select,
-  option = _jsonDomComponents.option;
+const {
+  div,
+  select,
+  option
+} = jsonDomComponents;
 
 /**
  * Builds the muscle -> exercise picker's DOM structure. No event wiring here - fullAddEventListener
@@ -24,18 +21,15 @@ var _jsonDomComponents = jsonDomComponents,
  * @param {Array} priorityRows - musclePriority()'s shape, ordered by priority - becomes the muscle dropdown's options, top priority first
  * @returns {{ container: DomItem, muscleSelect: DomItem, exerciseSelect: DomItem }}
  */
-var exercisePicker = exports.exercisePicker = function exercisePicker() {
-  var priorityRows = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [];
-  var muscleSelect = select(priorityRows.map(function (row) {
-    return option(String(row.muscleId), row.name);
-  }));
-  var exerciseSelect = select([option('', 'Pick a muscle first')], '', {
+const exercisePicker = (priorityRows = []) => {
+  const muscleSelect = select(priorityRows.map(row => option(String(row.muscleId), row.name)));
+  const exerciseSelect = select([option('', 'Pick a muscle first')], '', {
     disabled: true
   });
   return {
     container: div([muscleSelect, exerciseSelect], 'exercise-picker'),
-    muscleSelect: muscleSelect,
-    exerciseSelect: exerciseSelect
+    muscleSelect,
+    exerciseSelect
   };
 };
 
@@ -46,13 +40,9 @@ var exercisePicker = exports.exercisePicker = function exercisePicker() {
  * @param {Function} onMuscleChange - (muscleId: string) => void
  * @param {Function} onExerciseChange - (exerciseId: string) => void
  */
-var wireExercisePickerEvents = exports.wireExercisePickerEvents = function wireExercisePickerEvents(picker) {
-  var onMuscleChange = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : function () {};
-  var onExerciseChange = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : function () {};
-  jsonDom.fullAddEventListener('change', function () {
-    return onMuscleChange(picker.muscleSelect.element.value);
-  }, 'onMuscleChange', null, null, picker.muscleSelect);
-  jsonDom.fullAddEventListener('change', function () {
-    return onExerciseChange(picker.exerciseSelect.element.value);
-  }, 'onExerciseChange', null, null, picker.exerciseSelect);
+exports.exercisePicker = exercisePicker;
+const wireExercisePickerEvents = (picker, onMuscleChange = () => {}, onExerciseChange = () => {}) => {
+  jsonDom.fullAddEventListener('change', () => onMuscleChange(picker.muscleSelect.element.value), 'onMuscleChange', null, null, picker.muscleSelect);
+  jsonDom.fullAddEventListener('change', () => onExerciseChange(picker.exerciseSelect.element.value), 'onExerciseChange', null, null, picker.exerciseSelect);
 };
+exports.wireExercisePickerEvents = wireExercisePickerEvents;
