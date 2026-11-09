@@ -3,6 +3,14 @@ import { musclePriority } from './musclePriority.js'
 import { localDate } from './localDate.js'
 
 /**
+ * An id as a query value: quoted, since ids are strings and a generated one (a UUID such as
+ * 'aca3a0b4-5539-...') reads as subtraction when it isn't. A missing id stays missing, so the query still fails on it.
+ * @param id
+ * @returns {string|undefined|null}
+ */
+const quoteId = id => id === undefined || id === null ? id : quote(String(id))
+
+/**
  * Rank every muscle by how much it needs attention right now, from a real read of the database.
  * @param today - injectable for testing; defaults to the real current time
  */
@@ -24,7 +32,7 @@ export const getMusclePriority = async (today = new Date()) => {
 export const getExercisesForMuscle = async (muscleId) => {
   const queryString = 'read exercise_muscle.exercises' +
     ' on exercise_muscle.exercise_id = exercises._id' +
-    ` where muscle_id = ${muscleId}`
+    ` where muscle_id = ${quoteId(muscleId)}`
   const [rows] = await query(queryString)
   return rows.map(row => row.exercises[0])
 }
@@ -34,7 +42,7 @@ export const getExercisesForMuscle = async (muscleId) => {
  * @param exerciseId
  */
 export const getLastSession = async (exerciseId) => {
-  const queryString = `read workouts where exercise_id = ${exerciseId} sort date desc limit 1`
+  const queryString = `read workouts where exercise_id = ${quoteId(exerciseId)} sort date desc limit 1`
   const [rows] = await query(queryString)
   return rows[0] ?? null
 }
@@ -59,7 +67,7 @@ export const logWorkout = async ({
   order = 0
 }) => {
   const queryString = 'insert workouts values ' +
-    `exercise_id = ${exerciseId}, ` +
+    `exercise_id = ${quoteId(exerciseId)}, ` +
     `weight_effort = ${quote(weightEffort)}, ` +
     `sets = ${sets}, ` +
     `reps = ${reps}, ` +
@@ -92,7 +100,7 @@ export const updateWorkout = async (workoutId, { weightEffort, sets, reps, note 
   if (!assignments.length) {
     return null
   }
-  const queryString = `update workouts set ${assignments.join(', ')} where _id = ${workoutId}`
+  const queryString = `update workouts set ${assignments.join(', ')} where _id = ${quoteId(workoutId)}`
   const [rows] = await query(queryString)
   return rows[0] ?? null
 }
@@ -111,8 +119,8 @@ export const addExercise = async ({ name, description = '' }, muscleAssignments 
   const exercise = exerciseRows[0]
   for (const { muscleId, rank } of muscleAssignments) {
     const insertLinkQuery = 'insert exercise_muscle values ' +
-      `exercise_id = '${exercise._id}', ` +
-      `muscle_id = ${muscleId}, ` +
+      `exercise_id = ${quoteId(exercise._id)}, ` +
+      `muscle_id = ${quoteId(muscleId)}, ` +
       `muscle_rank = ${rank}`
     await query(insertLinkQuery)
   }
