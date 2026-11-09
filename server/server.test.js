@@ -5,6 +5,8 @@ import { setUp } from 'test-filesystem'
 import { configure } from '../assets/js/data/index.js'
 import { createTestDatabase } from '../assets/js/data/testDatabase.js'
 import { createApp } from './server.js'
+import { checkPacked } from 'json-fs-query'
+import fs from 'fs'
 
 const databasePath = 'server-test-database/'
 configure({ databasePath })
@@ -125,5 +127,17 @@ describe('workout-planner API', () => {
     expect(response.status).toBe(400)
     const body = await response.json()
     expect(body.error).toMatch(/Failed to interpret/)
+  })
+
+  test('a write packs the database again, so the page reads each record in one request', async () => {
+    const response = await fetch(`${baseUrl}/api/workouts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ exerciseId: benchPress, weightEffort: '125lbs', sets: 3, reps: 8, date: '2024-06-12' })
+    })
+    expect(response.status).toBe(200)
+    const packedWorkouts = JSON.parse(fs.readFileSync(`${databasePath}__packed/workouts.json`, 'utf8'))
+    expect(JSON.stringify(packedWorkouts)).toContain('2024-06-12')
+    expect(await checkPacked()).toEqual({ stale: [], orphaned: [] })
   })
 })

@@ -3,13 +3,15 @@ import { exercisePicker, wireExercisePickerEvents } from './components/templates
 import { lastSessionDisplay, formatLastSession } from './components/templates/lastSessionDisplay.js'
 import { logWorkoutForm, wireLogWorkoutFormEvents } from './components/templates/logWorkoutForm.js'
 import { addExerciseForm, wireAddExerciseFormEvents } from './components/templates/addExerciseForm.js'
+import { getMusclePriority, getExercisesForMuscle, getLastSession } from './data/browserReads.js'
 
 /* global jsonDom, jsonDomComponents -- both loaded as plain scripts in muscles.html before this native ES module runs, not npm imports */
 window.jsonDom = jsonDom
 const { option, text, main, header, heading } = jsonDomComponents
 
-// The query layer needs real Node filesystem access, which this page's own JS never has - see
-// server/server.js, which exposes it as JSON endpoints this page talks to instead.
+// Reads run here, on json-fs-query's browser build: it reads database/ from this page's own origin (see
+// data/browserReads.js), so the page works with no server running. Writes need real filesystem access, which a page
+// never has, so they still go to server/server.js (`npm run serve:api`).
 const API_BASE = 'http://localhost:3001'
 
 let picker
@@ -37,9 +39,7 @@ const onExerciseChange = (exerciseId) => {
     updateLastSession(null)
     return
   }
-  fetch(`${API_BASE}/api/last-session?exerciseId=${exerciseId}`)
-    .then((response) => response.json())
-    .then(updateLastSession)
+  getLastSession(exerciseId).then(updateLastSession)
 }
 
 const onLogWorkout = ({ weightEffort, sets, reps, note, date }) => {
@@ -102,8 +102,7 @@ const onAddExercise = ({ name, description, primaryMuscleIds, secondaryMuscleIds
 }
 
 const onMuscleChange = (muscleId) => {
-  fetch(`${API_BASE}/api/exercises-for-muscle?muscleId=${muscleId}`)
-    .then((response) => response.json())
+  getExercisesForMuscle(muscleId)
     .then((exercises) => {
       picker.exerciseSelect.children = exercises.length
         ? exercises.map((exercise) => option(String(exercise._id), exercise.name))
@@ -168,10 +167,9 @@ const renderPage = (priorityRows) => {
   }
 }
 
-fetch(`${API_BASE}/api/muscle-priority`)
-  .then((response) => response.json())
+getMusclePriority()
   .then(renderPage)
   .catch((error) => {
-    console.error('Could not load muscle priority from the API - is `npm run serve:api` running?', error)
+    console.error('Could not read the muscle priority from database/', error)
     renderPage([])
   })
