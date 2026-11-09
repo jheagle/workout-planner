@@ -7,6 +7,7 @@ import {
   updateWorkout,
   addExercise
 } from '../assets/js/data/workoutQueries.js'
+import { packDatabase } from '../assets/js/data/index.js'
 
 const readJsonBody = (request) => new Promise((resolve, reject) => {
   let body = ''
@@ -103,6 +104,11 @@ export const createApp = () => createServer(async (request, response) => {
   try {
     const match = url.pathname.match(route.pattern)
     const result = await route.handler(request, match.slice(1), url.searchParams)
+    if (route.method !== 'GET') {
+      // A write removes its record's packed file (json-fs-query never lets a page read a stale one), which sends the
+      // page's next read back to one request per row: pack again before answering, so that read is fast too
+      await packDatabase()
+    }
     sendJson(response, 200, result)
   } catch (error) {
     sendJson(response, 400, { error: error.message })
@@ -111,5 +117,9 @@ export const createApp = () => createServer(async (request, response) => {
 
 if (process.argv[1] && process.argv[1].endsWith('server.js')) {
   const port = process.env.PORT || 3001
-  createApp().listen(port, () => console.log(`workout-planner API listening on port ${port}`))
+  // Packed files are git-ignored, so a fresh checkout (or a hand edit) is packed once at start
+  packDatabase().then(({ records, rows }) => {
+    console.log(`database/ packed: ${records} records, ${rows} rows`)
+    createApp().listen(port, () => console.log(`workout-planner API listening on port ${port}`))
+  })
 }

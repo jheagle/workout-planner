@@ -4,5 +4,9 @@ node_modules/
 # Manually generated docs (npm run htmldocs), not committed
 /docs
 
+# Packed copies of each record (npm run db:pack, and the API server after every write): derived from database/, one
+# long line each, so committing them would rewrite the whole file on every logged workout
+/database/__packed/
+
 # Build output: intermediate step for the browser/ bundle (built by npm run build), not committed
 /dist

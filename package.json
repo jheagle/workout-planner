@@ -11,6 +11,7 @@
     "release": "release-it",
     "release:dry-run": "release-it --dry-run",
     "sass": "gulp sass",
+    "db:pack": "node -e \"import('./assets/js/data/index.js').then(({ packDatabase }) => packDatabase()).then(r => console.log('database/ packed:', r))\"",
     "serve:api": "node server/server.js",
     "test": "gulp testFull",
     "test:quick": "gulp testQuick",
