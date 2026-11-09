@@ -3,7 +3,7 @@ import { musclePriority } from './musclePriority.js'
 
 describe('musclePriority against the real database/', () => {
   test('wires up correctly against a real query result, not just hand-built fixtures', async () => {
-    expect(await describeEntities()).toEqual(['exercise_muscle.json', 'exercises.json', 'muscles.json', 'workouts.json'])
+    expect(await describeEntities()).toEqual(['exercise_muscle.json', 'exercises.json', 'muscles.json', 'workouts.json', 'categories.json', 'exercise_category.json', 'equipment.json', 'exercise_equipment.json'])
 
     const [muscles] = await query('read muscles')
     const queryString = 'read workouts.muscles' +
@@ -13,8 +13,8 @@ describe('musclePriority against the real database/', () => {
       ' merge muscles._id with exercise_muscle.muscle_id'
     const [workoutsWithMuscles] = await query(queryString)
 
-    // 3 days after the real seed data's most recent workout (2024-06-05)
-    const today = new Date(2024, 5, 8) // local midnight: only the local date counts
+    // 3 days after the most recent real workout (2026-10-30, from the imported sheets)
+    const today = new Date(2026, 10, 2) // local midnight: only the local date counts
     const result = musclePriority(muscles, workoutsWithMuscles, today)
 
     expect(result).toHaveLength(14)
@@ -23,11 +23,11 @@ describe('musclePriority against the real database/', () => {
     expect(neverWorked).toHaveLength(11)
     neverWorked.forEach(row => expect(row.needsPriority).toBe(true))
 
-    // Pectorals (bench press), Hamstrings (deadlift), Quadriceps (squat) were each worked twice,
-    // 3 days before "today" - past the recovery window, so still needing priority despite 2x/week
+    // Pectorals (barbell bench press) was last worked 6 days before "today", once this week:
+    // past the recovery window and under 2x/week, so it needs priority
     const pectorals = result.find(row => row.name === 'Pectorals')
-    expect(pectorals.timesWorkedThisWeek).toBe(2)
-    expect(pectorals.daysSinceLastWorked).toBe(3)
+    expect(pectorals.timesWorkedThisWeek).toBe(1)
+    expect(pectorals.daysSinceLastWorked).toBe(6)
     expect(pectorals.needsPriority).toBe(true)
   })
 })

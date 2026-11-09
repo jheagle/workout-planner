@@ -1,0 +1,1 @@
+{"path":"categories","definition":[{"name":"_id","type":"string","optional":false,"autoGenerate":false},{"name":"name","type":"string","optional":false,"autoGenerate":false},{"name":"kind","type":"string","optional":false,"autoGenerate":false}],"keys":[{"type":"primary","fields":["_id"],"lookup":"pk__id.json"}],"entries":["upper.json","lower.json","core.json"]}

@@ -3,7 +3,7 @@ import { describe as describeEntities, query } from './index.js'
 describe('data', () => {
   test('describe() lists the real entity files in database/', async () => {
     const entities = await describeEntities()
-    expect(entities).toEqual(['exercise_muscle.json', 'exercises.json', 'muscles.json', 'workouts.json'])
+    expect(entities).toEqual(['exercise_muscle.json', 'exercises.json', 'muscles.json', 'workouts.json', 'categories.json', 'exercise_category.json', 'equipment.json', 'exercise_equipment.json'])
   })
 
   test('query() reads real workout rows from database/', async () => {
