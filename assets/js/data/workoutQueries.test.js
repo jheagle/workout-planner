@@ -3,7 +3,7 @@
  */
 import { setUp } from 'test-filesystem'
 import { configure } from './index.js'
-import { copyDatabase } from './copyDatabase.js'
+import { createTestDatabase } from './testDatabase.js'
 import {
   getMusclePriority,
   getExercisesForMuscle,
@@ -17,21 +17,29 @@ const databasePath = 'workout-queries-test-database/'
 configure({ databasePath })
 setUp.setDefaults(databasePath)
 
-beforeEach(() => setUp.beforeEach().then(() => copyDatabase(databasePath)))
+// The seed rows, with their generated ids (benchPress is the Bench Press exercise's id, firstWorkout the first workout's)
+let benchPress
+let firstWorkout
+beforeEach(() => setUp.beforeEach()
+  .then(() => createTestDatabase(databasePath))
+  .then(inserted => {
+    benchPress = inserted.exercises.find(row => row.name === 'Bench Press')._id
+    firstWorkout = inserted.workouts[0]._id
+  }))
 afterEach(setUp.afterEach)
 
 describe('workoutQueries', () => {
   test('getMusclePriority wires up against the real database, same as the dedicated integration test', async () => {
-    const result = await getMusclePriority(new Date(2026, 10, 2))
+    const result = await getMusclePriority(new Date(2024, 5, 8))
     expect(result).toHaveLength(14)
-    expect(result.find(row => row.name === 'Pectorals').timesWorkedThisWeek).toBe(1)
+    expect(result.find(row => row.name === 'Pectorals').timesWorkedThisWeek).toBe(2)
   })
 
   test('getExercisesForMuscle finds the real exercise linked to a real muscle', async () => {
-    // Pectorals (_id 11) is linked to Barbell bench press (the seed's Bench Press, renamed by the import)
+    // Pectorals (_id 11) is linked to Bench Press in the seed data
     const exercises = await getExercisesForMuscle(11)
     expect(exercises).toHaveLength(1)
-    expect(exercises[0].name).toBe('Barbell bench press')
+    expect(exercises[0].name).toBe('Bench Press')
   })
 
   test('getExercisesForMuscle returns nothing for a muscle with no linked exercise yet', async () => {
@@ -40,9 +48,9 @@ describe('workoutQueries', () => {
   })
 
   test('getLastSession finds the most recent real workout for an exercise', async () => {
-    const session = await getLastSession(1) // Barbell bench press
-    expect(session.date).toBe('2026-10-27')
-    expect(session.weight_effort).toBe('145lbs')
+    const session = await getLastSession(benchPress)
+    expect(session.date).toBe('2024-06-05')
+    expect(session.weight_effort).toBe('120lbs')
   })
 
   test('getLastSession returns null for an exercise never logged', async () => {
@@ -52,38 +60,38 @@ describe('workoutQueries', () => {
 
   test('logWorkout inserts a new real entry, immediately visible to getLastSession', async () => {
     const logged = await logWorkout({
-      exerciseId: 1,
+      exerciseId: benchPress,
       weightEffort: '125lbs',
       sets: 3,
       reps: 8,
-      date: '2026-11-12'
+      date: '2024-06-12'
     })
     expect(logged.weight_effort).toBe('125lbs')
 
-    const session = await getLastSession(1)
-    expect(session.date).toBe('2026-11-12')
+    const session = await getLastSession(benchPress)
+    expect(session.date).toBe('2024-06-12')
     expect(session.weight_effort).toBe('125lbs')
   })
 
   test('logWorkout keeps free text exactly as typed, quotes and query syntax included', async () => {
     const note = "felt great, didn't even need a spotter; C:\\gym -- \"PR\" /* next */ [x]"
     const logged = await logWorkout({
-      exerciseId: 1,
+      exerciseId: benchPress,
       weightEffort: "bar + 2 25's",
       sets: 3,
       reps: 8,
       note,
-      date: '2026-11-12'
+      date: '2024-06-12'
     })
     expect(logged.note).toBe(note)
     expect(logged.weight_effort).toBe("bar + 2 25's")
 
-    const session = await getLastSession(1)
+    const session = await getLastSession(benchPress)
     expect(session.note).toBe(note)
   })
 
   test('updateWorkout keeps free text exactly as typed', async () => {
-    const updated = await updateWorkout(1, { note: "spotter's call \\ last set" })
+    const updated = await updateWorkout(firstWorkout, { note: "spotter's call \\ last set" })
     expect(updated.note).toBe("spotter's call \\ last set")
   })
 
@@ -94,7 +102,7 @@ describe('workoutQueries', () => {
     // Only Date is faked: the database is real files, so timers and ticks must keep running
     jest.useFakeTimers({ now: new Date(2026, 9, 26, hours, minutes), doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask', 'hrtime', 'performance'] })
     try {
-      const logged = await logWorkout({ exerciseId: 1, sets: 3, reps: 8 })
+      const logged = await logWorkout({ exerciseId: benchPress, sets: 3, reps: 8 })
       expect(logged.date).toBe('2026-10-26')
     } finally {
       jest.useRealTimers()
@@ -102,7 +110,7 @@ describe('workoutQueries', () => {
   })
 
   test('updateWorkout corrects an existing real entry', async () => {
-    const updated = await updateWorkout(1, { weightEffort: '120lbs', reps: 12 })
+    const updated = await updateWorkout(firstWorkout, { weightEffort: '120lbs', reps: 12 })
     expect(updated.weight_effort).toBe('120lbs')
     expect(updated.reps).toBe(12)
     // untouched fields survive the update

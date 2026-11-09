@@ -3,7 +3,7 @@
  */
 import { setUp } from 'test-filesystem'
 import { configure } from '../assets/js/data/index.js'
-import { copyDatabase } from '../assets/js/data/copyDatabase.js'
+import { createTestDatabase } from '../assets/js/data/testDatabase.js'
 import { createApp } from './server.js'
 
 const databasePath = 'server-test-database/'
@@ -12,10 +12,15 @@ setUp.setDefaults(databasePath)
 
 let server
 let baseUrl
+// The seed rows' generated ids: the Bench Press exercise, and the first workout
+let benchPress
+let firstWorkout
 
 beforeEach(async () => {
   await setUp.beforeEach()
-  await copyDatabase(databasePath)
+  const inserted = await createTestDatabase(databasePath)
+  benchPress = inserted.exercises.find(row => row.name === 'Bench Press')._id
+  firstWorkout = inserted.workouts[0]._id
   server = createApp()
   await new Promise(resolve => server.listen(0, resolve))
   baseUrl = `http://localhost:${server.address().port}`
@@ -38,7 +43,7 @@ describe('workout-planner API', () => {
     const response = await fetch(`${baseUrl}/api/exercises-for-muscle?muscleId=11`)
     const body = await response.json()
     expect(body).toHaveLength(1)
-    expect(body[0].name).toBe('Barbell bench press')
+    expect(body[0].name).toBe('Bench Press')
   })
 
   test('GET /api/exercises-for-muscle returns nothing for a muscle with no linked exercise yet', async () => {
@@ -48,9 +53,9 @@ describe('workout-planner API', () => {
   })
 
   test('GET /api/last-session returns the most recent real session for an exercise', async () => {
-    const response = await fetch(`${baseUrl}/api/last-session?exerciseId=1`)
+    const response = await fetch(`${baseUrl}/api/last-session?exerciseId=${benchPress}`)
     const body = await response.json()
-    expect(body.date).toBe('2026-10-27')
+    expect(body.date).toBe('2024-06-05')
   })
 
   test('GET /api/last-session returns null for an exercise never logged', async () => {
@@ -63,7 +68,7 @@ describe('workout-planner API', () => {
     const response = await fetch(`${baseUrl}/api/workouts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ exerciseId: 1, weightEffort: '125lbs', sets: 3, reps: 8, date: '2024-06-12' })
+      body: JSON.stringify({ exerciseId: benchPress, weightEffort: '125lbs', sets: 3, reps: 8, date: '2024-06-12' })
     })
     expect(response.status).toBe(200)
     const body = await response.json()
@@ -71,7 +76,7 @@ describe('workout-planner API', () => {
   })
 
   test('PATCH /api/workouts/:id updates a real entry', async () => {
-    const response = await fetch(`${baseUrl}/api/workouts/1`, {
+    const response = await fetch(`${baseUrl}/api/workouts/${firstWorkout}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ weightEffort: '120lbs', reps: 12 })
