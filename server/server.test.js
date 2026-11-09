@@ -38,7 +38,7 @@ describe('workout-planner API', () => {
     const response = await fetch(`${baseUrl}/api/exercises-for-muscle?muscleId=11`)
     const body = await response.json()
     expect(body).toHaveLength(1)
-    expect(body[0].name).toBe('Bench Press')
+    expect(body[0].name).toBe('Barbell bench press')
   })
 
   test('GET /api/exercises-for-muscle returns nothing for a muscle with no linked exercise yet', async () => {
@@ -50,7 +50,7 @@ describe('workout-planner API', () => {
   test('GET /api/last-session returns the most recent real session for an exercise', async () => {
     const response = await fetch(`${baseUrl}/api/last-session?exerciseId=1`)
     const body = await response.json()
-    expect(body.date).toBe('2024-06-05')
+    expect(body.date).toBe('2026-10-27')
   })
 
   test('GET /api/last-session returns null for an exercise never logged', async () => {

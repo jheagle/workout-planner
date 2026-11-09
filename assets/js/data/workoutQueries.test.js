@@ -22,16 +22,16 @@ afterEach(setUp.afterEach)
 
 describe('workoutQueries', () => {
   test('getMusclePriority wires up against the real database, same as the dedicated integration test', async () => {
-    const result = await getMusclePriority(new Date(2024, 5, 8))
+    const result = await getMusclePriority(new Date(2026, 10, 2))
     expect(result).toHaveLength(14)
-    expect(result.find(row => row.name === 'Pectorals').timesWorkedThisWeek).toBe(2)
+    expect(result.find(row => row.name === 'Pectorals').timesWorkedThisWeek).toBe(1)
   })
 
   test('getExercisesForMuscle finds the real exercise linked to a real muscle', async () => {
-    // Pectorals (_id 11) is linked to Bench Press via the real seed data
+    // Pectorals (_id 11) is linked to Barbell bench press (the seed's Bench Press, renamed by the import)
     const exercises = await getExercisesForMuscle(11)
     expect(exercises).toHaveLength(1)
-    expect(exercises[0].name).toBe('Bench Press')
+    expect(exercises[0].name).toBe('Barbell bench press')
   })
 
   test('getExercisesForMuscle returns nothing for a muscle with no linked exercise yet', async () => {
@@ -40,9 +40,9 @@ describe('workoutQueries', () => {
   })
 
   test('getLastSession finds the most recent real workout for an exercise', async () => {
-    const session = await getLastSession(1) // Bench Press
-    expect(session.date).toBe('2024-06-05')
-    expect(session.weight_effort).toBe('120lbs')
+    const session = await getLastSession(1) // Barbell bench press
+    expect(session.date).toBe('2026-10-27')
+    expect(session.weight_effort).toBe('145lbs')
   })
 
   test('getLastSession returns null for an exercise never logged', async () => {
@@ -56,12 +56,12 @@ describe('workoutQueries', () => {
       weightEffort: '125lbs',
       sets: 3,
       reps: 8,
-      date: '2024-06-12'
+      date: '2026-11-12'
     })
     expect(logged.weight_effort).toBe('125lbs')
 
     const session = await getLastSession(1)
-    expect(session.date).toBe('2024-06-12')
+    expect(session.date).toBe('2026-11-12')
     expect(session.weight_effort).toBe('125lbs')
   })
 
@@ -73,7 +73,7 @@ describe('workoutQueries', () => {
       sets: 3,
       reps: 8,
       note,
-      date: '2024-06-12'
+      date: '2026-11-12'
     })
     expect(logged.note).toBe(note)
     expect(logged.weight_effort).toBe("bar + 2 25's")
