@@ -58,7 +58,7 @@
   },
   "dependencies": {
     "browser-or-node": "^3.0.0",
-    "json-fs-query": "^3.6.0",
+    "json-fs-query": "^3.7.0",
     "si-funciona": "^2.10.0",
     "treeloom": "^2.0.0",
     "treeloom-components": "^0.2.0"
