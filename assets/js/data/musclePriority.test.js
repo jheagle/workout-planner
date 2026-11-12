@@ -83,6 +83,23 @@ describe('musclePriority', () => {
     expect(result.timesWorkedThisWeek).toBe(1)
   })
 
+  test('a workout dated after today is ignored: no negative days-since, not counted this week', () => {
+    const workouts = [
+      workout('2024-06-12', [muscle(1, 'Chest')]),
+      workout('2024-06-08', [muscle(1, 'Chest')])
+    ]
+    const [result] = musclePriority([muscle(1, 'Chest')], workouts, today)
+    expect(result.daysSinceLastWorked).toBe(2)
+    expect(result.timesWorkedThisWeek).toBe(1)
+    expect(result.needsPriority).toBe(true)
+  })
+
+  test('a muscle only worked after today counts as never worked', () => {
+    const [result] = musclePriority([muscle(1, 'Chest')], [workout('2024-06-11', [muscle(1, 'Chest')])], today)
+    expect(result.daysSinceLastWorked).toBe(Infinity)
+    expect(result.timesWorkedThisWeek).toBe(0)
+  })
+
   test('one workout can carry multiple muscles (a compound exercise), crediting all of them', () => {
     const workouts = [workout('2024-06-10', [muscle(1, 'Chest'), muscle(2, 'Triceps')])]
     const result = musclePriority([muscle(1, 'Chest'), muscle(2, 'Triceps')], workouts, today)
