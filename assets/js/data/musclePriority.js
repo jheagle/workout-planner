@@ -24,7 +24,8 @@ const dayNumber = (date) => {
  * @param muscles - every row from `read muscles`
  * @param workoutsWithMuscles - every row from the workouts-joined-to-muscles query, each carrying
  * a `.muscles` array (the muscles that workout's exercise worked)
- * @param today - injectable for testing; defaults to the real current time (only its local date counts)
+ * @param today - injectable for testing; defaults to the real current time (only its local date counts). Workouts
+ * dated after it are ignored
  */
 export const musclePriority = (muscles = [], workoutsWithMuscles = [], today = new Date()) => {
   const stats = {}
@@ -37,6 +38,11 @@ export const musclePriority = (muscles = [], workoutsWithMuscles = [], today = n
 
   workoutsWithMuscles.forEach(workout => {
     const workoutDate = dayNumber(workout.date)
+    // A workout dated after "today" (logged ahead, or a past "today" passed in) hasn't happened yet as of today:
+    // counting it gave a negative daysSinceLastWorked and counted it as this week
+    if (workoutDate > todayNumber) {
+      return
+    }
     ;(workout.muscles || []).forEach(muscle => {
       const stat = stats[muscle._id]
       if (!stat) {
