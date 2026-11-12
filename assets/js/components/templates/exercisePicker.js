@@ -1,5 +1,5 @@
-/* global jsonDom, jsonDomComponents -- both loaded as plain scripts in muscles.html before this native ES module runs, not npm imports */
-const { div, select, option } = jsonDomComponents
+/* global treeloom, treeloomComponents -- both loaded as plain scripts in muscles.html before this native ES module runs, not npm imports */
+const { div, select, option } = treeloomComponents
 
 /**
  * Builds the muscle -> exercise picker's DOM structure. No event wiring here - fullAddEventListener
@@ -34,7 +34,7 @@ export const exercisePicker = (priorityRows = []) => {
  * @param {Function} onExerciseChange - (exerciseId: string) => void
  */
 export const wireExercisePickerEvents = (picker, onMuscleChange = () => {}, onExerciseChange = () => {}) => {
-  jsonDom.fullAddEventListener(
+  treeloom.fullAddEventListener(
     'change',
     () => onMuscleChange(picker.muscleSelect.element.value),
     'onMuscleChange',
@@ -42,7 +42,7 @@ export const wireExercisePickerEvents = (picker, onMuscleChange = () => {}, onEx
     null,
     picker.muscleSelect
   )
-  jsonDom.fullAddEventListener(
+  treeloom.fullAddEventListener(
     'change',
     () => onExerciseChange(picker.exerciseSelect.element.value),
     'onExerciseChange',

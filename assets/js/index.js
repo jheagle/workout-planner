@@ -5,9 +5,9 @@ import { logWorkoutForm, wireLogWorkoutFormEvents } from './components/templates
 import { addExerciseForm, wireAddExerciseFormEvents } from './components/templates/addExerciseForm.js'
 import { getMusclePriority, getExercisesForMuscle, getLastSession } from './data/browserReads.js'
 
-/* global jsonDom, jsonDomComponents -- both loaded as plain scripts in muscles.html before this native ES module runs, not npm imports */
-window.jsonDom = jsonDom
-const { option, text, main, header, heading } = jsonDomComponents
+/* global treeloom, treeloomComponents -- both loaded as plain scripts in muscles.html before this native ES module runs, not npm imports */
+window.treeloom = treeloom
+const { option, text, main, header, heading } = treeloomComponents
 
 // Reads run here, on json-fs-query's browser build: it reads database/ from this page's own origin (see
 // data/browserReads.js), so the page works with no server running. Writes need real filesystem access, which a page
@@ -31,7 +31,7 @@ const updateLastSession = (session) => {
   lastSessionId = session ? session._id : null
   fillFormFrom(session)
   lastSessionItem.children = [text(formatLastSession(session))]
-  jsonDom.updateChildNodes(lastSessionItem)
+  treeloom.updateChildNodes(lastSessionItem)
 }
 
 const onExerciseChange = (exerciseId) => {
@@ -108,7 +108,7 @@ const onMuscleChange = (muscleId) => {
         ? exercises.map((exercise) => option(String(exercise._id), exercise.name))
         : [option('', 'No exercises for this muscle yet')]
       picker.exerciseSelect.element.disabled = exercises.length === 0
-      jsonDom.updateChildNodes(picker.exerciseSelect)
+      treeloom.updateChildNodes(picker.exerciseSelect)
       if (!exercises.length) {
         updateLastSession(null)
         return
@@ -126,8 +126,8 @@ const renderPage = (priorityRows) => {
   lastSessionItem = lastSessionDisplay(null)
   logForm = logWorkoutForm()
   addForm = addExerciseForm(priorityRows)
-  const documentItem = jsonDom.documentItem
-  jsonDom.updateDomItems(documentItem)
+  const documentItem = treeloom.documentItem
+  treeloom.updateDomItems(documentItem)
 
   documentItem.head.children.push(priorityTable.style)
 
@@ -145,19 +145,19 @@ const renderPage = (priorityRows) => {
   documentItem.body.children.push(mainContent)
 
   // Update the body child node list to include the header
-  jsonDom.updateChildNodes(documentItem.head)
+  treeloom.updateChildNodes(documentItem.head)
   // Update the style for the table
-  jsonDom.updateElements(priorityTable.style)
+  treeloom.updateElements(priorityTable.style)
 
-  jsonDom.updateChildNodes(documentItem.body)
+  treeloom.updateChildNodes(documentItem.body)
   // Update the header to generate the elements
-  jsonDom.updateElements(mainHeader)
+  treeloom.updateElements(mainHeader)
   // Update the table to generate the elements
-  jsonDom.updateElements(mainContent)
+  treeloom.updateElements(mainContent)
 
   // Only now does every new node have both a real element and a complete parentItem chain up to
   // documentItem - fullAddEventListener needs both, so event wiring has to happen after this.
-  jsonDom.setParentItemReferences(documentItem)
+  treeloom.setParentItemReferences(documentItem)
   wireExercisePickerEvents(picker, onMuscleChange, onExerciseChange)
   wireLogWorkoutFormEvents(logForm, onLogWorkout, onUpdateWorkout)
   wireAddExerciseFormEvents(addForm, onAddExercise)

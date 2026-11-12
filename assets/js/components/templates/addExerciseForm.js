@@ -1,5 +1,5 @@
-/* global jsonDom, jsonDomComponents -- both loaded as plain scripts in muscles.html before this native ES module runs, not npm imports */
-const { div, input, select, option, button } = jsonDomComponents
+/* global treeloom, treeloomComponents -- both loaded as plain scripts in muscles.html before this native ES module runs, not npm imports */
+const { div, input, select, option, button } = treeloomComponents
 
 /**
  * Builds the add-exercise form's DOM structure. No event wiring here - see exercisePicker.js's
@@ -47,7 +47,7 @@ export const readAddExerciseValues = (form) => ({
  * @param {Function} onSubmit - ({ name, description, primaryMuscleIds, secondaryMuscleIds }) => void
  */
 export const wireAddExerciseFormEvents = (form, onSubmit = () => {}) => {
-  jsonDom.fullAddEventListener(
+  treeloom.fullAddEventListener(
     'click',
     () => onSubmit(readAddExerciseValues(form)),
     'onAddExercise',
