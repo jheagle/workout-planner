@@ -1749,7 +1749,7 @@ var workoutPlanner = (() => {
         tableRow,
         text: text2,
         style
-      } = jsonDomComponents;
+      } = treeloomComponents;
       var tableStyle = "/* \nMax width before this PARTICULAR table gets nasty\nThis query will take effect for any screen smaller than 760px\nand also iPads specifically.\n*/\n@media \nonly screen and (max-width: 760px),\n(min-device-width: 768px) and (max-device-width: 1024px)  {\n";
       var addLabelStyle = (label, index, tableId) => `	.${tableId} td:nth-of-type(${index}):before { content: "${label}"; }
 `;
@@ -1826,7 +1826,7 @@ var workoutPlanner = (() => {
         div,
         select,
         option: option2
-      } = jsonDomComponents;
+      } = treeloomComponents;
       var exercisePicker = (priorityRows = []) => {
         const muscleSelect = select(priorityRows.map((row) => option2(String(row.muscleId), row.name)));
         const exerciseSelect = select([option2("", "Pick a muscle first")], "", {
@@ -1842,8 +1842,8 @@ var workoutPlanner = (() => {
       var wireExercisePickerEvents = (picker2, onMuscleChange2 = () => {
       }, onExerciseChange2 = () => {
       }) => {
-        jsonDom.fullAddEventListener("change", () => onMuscleChange2(picker2.muscleSelect.element.value), "onMuscleChange", null, null, picker2.muscleSelect);
-        jsonDom.fullAddEventListener("change", () => onExerciseChange2(picker2.exerciseSelect.element.value), "onExerciseChange", null, null, picker2.exerciseSelect);
+        treeloom.fullAddEventListener("change", () => onMuscleChange2(picker2.muscleSelect.element.value), "onMuscleChange", null, null, picker2.muscleSelect);
+        treeloom.fullAddEventListener("change", () => onExerciseChange2(picker2.exerciseSelect.element.value), "onExerciseChange", null, null, picker2.exerciseSelect);
       };
       exports.wireExercisePickerEvents = wireExercisePickerEvents;
     }
@@ -1861,7 +1861,7 @@ var workoutPlanner = (() => {
       var {
         div,
         text: text2
-      } = jsonDomComponents;
+      } = treeloomComponents;
       var formatLastSession = (session) => session ? `Last time: ${session.weight_effort || "no weight recorded"}, ${session.sets}x${session.reps} on ${session.date}` : "No previous session for this exercise yet.";
       exports.formatLastSession = formatLastSession;
       var lastSessionDisplay = (session = null) => div([text2(formatLastSession(session))], "last-session");
@@ -1897,7 +1897,7 @@ var workoutPlanner = (() => {
         div,
         input,
         button
-      } = jsonDomComponents;
+      } = treeloomComponents;
       var logWorkoutForm = () => {
         const weightEffortInput = input("text", "", null, [], void 0, {
           placeholder: "Weight / effort (e.g. 120lbs)"
@@ -1939,8 +1939,8 @@ var workoutPlanner = (() => {
       var wireLogWorkoutFormEvents = (form, onSubmit = () => {
       }, onUpdate = () => {
       }) => {
-        jsonDom.fullAddEventListener("click", () => onSubmit(readFormValues(form)), "onLogWorkout", null, null, form.submitButton);
-        jsonDom.fullAddEventListener("click", () => onUpdate(readFormValues(form)), "onUpdateWorkout", null, null, form.updateButton);
+        treeloom.fullAddEventListener("click", () => onSubmit(readFormValues(form)), "onLogWorkout", null, null, form.submitButton);
+        treeloom.fullAddEventListener("click", () => onUpdate(readFormValues(form)), "onUpdateWorkout", null, null, form.updateButton);
       };
       exports.wireLogWorkoutFormEvents = wireLogWorkoutFormEvents;
     }
@@ -1961,7 +1961,7 @@ var workoutPlanner = (() => {
         select,
         option: option2,
         button
-      } = jsonDomComponents;
+      } = treeloomComponents;
       var addExerciseForm = (muscles = []) => {
         const nameInput = input("text", "", null, [], void 0, {
           placeholder: "Exercise name"
@@ -2000,9 +2000,146 @@ var workoutPlanner = (() => {
       exports.readAddExerciseValues = readAddExerciseValues;
       var wireAddExerciseFormEvents = (form, onSubmit = () => {
       }) => {
-        jsonDom.fullAddEventListener("click", () => onSubmit(readAddExerciseValues(form)), "onAddExercise", null, null, form.submitButton);
+        treeloom.fullAddEventListener("click", () => onSubmit(readAddExerciseValues(form)), "onAddExercise", null, null, form.submitButton);
       };
       exports.wireAddExerciseFormEvents = wireAddExerciseFormEvents;
+    }
+  });
+
+  // js-build-tools-cjs:dist/data/musclePriority.js
+  var require_musclePriority = __commonJS({
+    "js-build-tools-cjs:dist/data/musclePriority.js"(exports) {
+      "use strict";
+      init_process();
+      Object.defineProperty(exports, "__esModule", {
+        value: true
+      });
+      exports.musclePriority = void 0;
+      var _localDate = require_localDate();
+      var MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1e3;
+      var RECOVERY_DAYS = 3;
+      var TARGET_TIMES_PER_WEEK = 2;
+      var dayNumber = (date) => {
+        const [year, month, day] = date.split("-").map(Number);
+        return Date.UTC(year, month - 1, day) / MILLISECONDS_PER_DAY;
+      };
+      var musclePriority = (muscles = [], workoutsWithMuscles = [], today = /* @__PURE__ */ new Date()) => {
+        const stats = {};
+        muscles.forEach((muscle) => {
+          stats[muscle._id] = {
+            muscle,
+            lastWorkedDate: null,
+            datesThisWeek: /* @__PURE__ */ new Set()
+          };
+        });
+        const todayNumber = dayNumber((0, _localDate.localDate)(today));
+        const weekAgo = todayNumber - 7;
+        workoutsWithMuscles.forEach((workout) => {
+          const workoutDate = dayNumber(workout.date);
+          (workout.muscles || []).forEach((muscle) => {
+            const stat = stats[muscle._id];
+            if (!stat) {
+              return;
+            }
+            if (stat.lastWorkedDate === null || workoutDate > stat.lastWorkedDate) {
+              stat.lastWorkedDate = workoutDate;
+            }
+            if (workoutDate >= weekAgo) {
+              stat.datesThisWeek.add(workout.date);
+            }
+          });
+        });
+        return Object.values(stats).map(({
+          muscle,
+          lastWorkedDate,
+          datesThisWeek
+        }) => {
+          const daysSinceLastWorked = lastWorkedDate !== null ? todayNumber - lastWorkedDate : Infinity;
+          const timesWorkedThisWeek = datesThisWeek.size;
+          return {
+            muscleId: muscle._id,
+            name: muscle.name,
+            daysSinceLastWorked,
+            timesWorkedThisWeek,
+            needsPriority: daysSinceLastWorked >= RECOVERY_DAYS || timesWorkedThisWeek < TARGET_TIMES_PER_WEEK
+          };
+        }).sort((first, second) => {
+          if (first.needsPriority !== second.needsPriority) {
+            return first.needsPriority ? -1 : 1;
+          }
+          return second.daysSinceLastWorked - first.daysSinceLastWorked;
+        });
+      };
+      exports.musclePriority = musclePriority;
+    }
+  });
+
+  // js-build-tools-cjs:dist/data/reads.js
+  var require_reads = __commonJS({
+    "js-build-tools-cjs:dist/data/reads.js"(exports) {
+      "use strict";
+      init_process();
+      Object.defineProperty(exports, "__esModule", {
+        value: true
+      });
+      exports.createReads = void 0;
+      var _musclePriority = require_musclePriority();
+      var createReads = ({
+        query,
+        quote
+      }) => {
+        const quoteId = (id) => id === void 0 || id === null ? id : quote(String(id));
+        const getMusclePriority = async (today = /* @__PURE__ */ new Date()) => {
+          const [muscles] = await query("read muscles");
+          const joinQueryString = "read workouts.muscles on workouts.exercise_id = exercises._id and on exercises._id = exercise_muscle.exercise_id and on exercise_muscle.muscle_id = muscles._id merge muscles._id with exercise_muscle.muscle_id";
+          const [workoutsWithMuscles] = await query(joinQueryString);
+          return (0, _musclePriority.musclePriority)(muscles, workoutsWithMuscles, today);
+        };
+        const getExercisesForMuscle = async (muscleId) => {
+          const queryString = `read exercise_muscle.exercises on exercise_muscle.exercise_id = exercises._id where muscle_id = ${quoteId(muscleId)}`;
+          const [rows] = await query(queryString);
+          return rows.map((row) => row.exercises[0]);
+        };
+        const getLastSession = async (exerciseId) => {
+          const queryString = `read workouts where exercise_id = ${quoteId(exerciseId)} sort date desc limit 1`;
+          const [rows] = await query(queryString);
+          return rows[0] ?? null;
+        };
+        return {
+          quoteId,
+          getMusclePriority,
+          getExercisesForMuscle,
+          getLastSession
+        };
+      };
+      exports.createReads = createReads;
+    }
+  });
+
+  // js-build-tools-cjs:dist/data/browserReads.js
+  var require_browserReads = __commonJS({
+    "js-build-tools-cjs:dist/data/browserReads.js"(exports) {
+      "use strict";
+      init_process();
+      Object.defineProperty(exports, "__esModule", {
+        value: true
+      });
+      exports.getMusclePriority = exports.getLastSession = exports.getExercisesForMuscle = void 0;
+      var _reads = require_reads();
+      jsonFsQuery.configure({
+        databasePath: "database/",
+        fetchOptions: {
+          cache: "no-cache"
+        }
+      });
+      var {
+        getMusclePriority,
+        getExercisesForMuscle,
+        getLastSession
+      } = (0, _reads.createReads)(jsonFsQuery);
+      exports.getLastSession = getLastSession;
+      exports.getExercisesForMuscle = getExercisesForMuscle;
+      exports.getMusclePriority = getMusclePriority;
     }
   });
 
@@ -2014,14 +2151,15 @@ var workoutPlanner = (() => {
   var _lastSessionDisplay = require_lastSessionDisplay();
   var _logWorkoutForm = require_logWorkoutForm();
   var _addExerciseForm = require_addExerciseForm();
-  window.jsonDom = jsonDom;
+  var _browserReads = require_browserReads();
+  window.treeloom = treeloom;
   var {
     option,
     text,
     main,
     header,
     heading
-  } = jsonDomComponents;
+  } = treeloomComponents;
   var API_BASE = "http://localhost:3001";
   var picker;
   var lastSessionItem;
@@ -2038,14 +2176,14 @@ var workoutPlanner = (() => {
     lastSessionId = session ? session._id : null;
     fillFormFrom(session);
     lastSessionItem.children = [text((0, _lastSessionDisplay.formatLastSession)(session))];
-    jsonDom.updateChildNodes(lastSessionItem);
+    treeloom.updateChildNodes(lastSessionItem);
   };
   var onExerciseChange = (exerciseId) => {
     if (!exerciseId) {
       updateLastSession(null);
       return;
     }
-    fetch(`${API_BASE}/api/last-session?exerciseId=${exerciseId}`).then((response) => response.json()).then(updateLastSession);
+    (0, _browserReads.getLastSession)(exerciseId).then(updateLastSession);
   };
   var onLogWorkout = ({
     weightEffort,
@@ -2135,10 +2273,10 @@ var workoutPlanner = (() => {
     });
   };
   var onMuscleChange = (muscleId) => {
-    fetch(`${API_BASE}/api/exercises-for-muscle?muscleId=${muscleId}`).then((response) => response.json()).then((exercises) => {
+    (0, _browserReads.getExercisesForMuscle)(muscleId).then((exercises) => {
       picker.exerciseSelect.children = exercises.length ? exercises.map((exercise) => option(String(exercise._id), exercise.name)) : [option("", "No exercises for this muscle yet")];
       picker.exerciseSelect.element.disabled = exercises.length === 0;
-      jsonDom.updateChildNodes(picker.exerciseSelect);
+      treeloom.updateChildNodes(picker.exerciseSelect);
       if (!exercises.length) {
         updateLastSession(null);
         return;
@@ -2155,18 +2293,18 @@ var workoutPlanner = (() => {
     lastSessionItem = (0, _lastSessionDisplay.lastSessionDisplay)(null);
     logForm = (0, _logWorkoutForm.logWorkoutForm)();
     addForm = (0, _addExerciseForm.addExerciseForm)(priorityRows);
-    const documentItem = jsonDom.documentItem;
-    jsonDom.updateDomItems(documentItem);
+    const documentItem = treeloom.documentItem;
+    treeloom.updateDomItems(documentItem);
     documentItem.head.children.push(priorityTable.style);
     documentItem.body.children.unshift(mainHeader);
     const mainContent = main([priorityTable.table, picker.container, lastSessionItem, logForm.container, addForm.container]);
     documentItem.body.children.push(mainContent);
-    jsonDom.updateChildNodes(documentItem.head);
-    jsonDom.updateElements(priorityTable.style);
-    jsonDom.updateChildNodes(documentItem.body);
-    jsonDom.updateElements(mainHeader);
-    jsonDom.updateElements(mainContent);
-    jsonDom.setParentItemReferences(documentItem);
+    treeloom.updateChildNodes(documentItem.head);
+    treeloom.updateElements(priorityTable.style);
+    treeloom.updateChildNodes(documentItem.body);
+    treeloom.updateElements(mainHeader);
+    treeloom.updateElements(mainContent);
+    treeloom.setParentItemReferences(documentItem);
     (0, _exercisePicker.wireExercisePickerEvents)(picker, onMuscleChange, onExerciseChange);
     (0, _logWorkoutForm.wireLogWorkoutFormEvents)(logForm, onLogWorkout, onUpdateWorkout);
     (0, _addExerciseForm.wireAddExerciseFormEvents)(addForm, onAddExercise);
@@ -2174,8 +2312,8 @@ var workoutPlanner = (() => {
       onMuscleChange(String(priorityRows[0].muscleId));
     }
   };
-  fetch(`${API_BASE}/api/muscle-priority`).then((response) => response.json()).then(renderPage).catch((error) => {
-    console.error("Could not load muscle priority from the API - is `npm run serve:api` running?", error);
+  (0, _browserReads.getMusclePriority)().then(renderPage).catch((error) => {
+    console.error("Could not read the muscle priority from database/", error);
     renderPage([]);
   });
 })();

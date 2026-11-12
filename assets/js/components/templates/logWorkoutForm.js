@@ -1,7 +1,7 @@
-/* global jsonDom, jsonDomComponents -- both loaded as plain scripts in muscles.html before this native ES module runs, not npm imports */
+/* global treeloom, treeloomComponents -- both loaded as plain scripts in muscles.html before this native ES module runs, not npm imports */
 import { localDate } from '../../data/localDate.js'
 
-const { div, input, button } = jsonDomComponents
+const { div, input, button } = treeloomComponents
 
 /**
  * Builds the log-workout form's DOM structure. No event wiring here - see exercisePicker.js's
@@ -51,7 +51,7 @@ export const readFormValues = (form) => ({
  * @param {Function} onUpdate - ({ weightEffort, sets, reps, note, date }) => void, corrects the most recently shown entry
  */
 export const wireLogWorkoutFormEvents = (form, onSubmit = () => {}, onUpdate = () => {}) => {
-  jsonDom.fullAddEventListener(
+  treeloom.fullAddEventListener(
     'click',
     () => onSubmit(readFormValues(form)),
     'onLogWorkout',
@@ -59,7 +59,7 @@ export const wireLogWorkoutFormEvents = (form, onSubmit = () => {}, onUpdate = (
     null,
     form.submitButton
   )
-  jsonDom.fullAddEventListener(
+  treeloom.fullAddEventListener(
     'click',
     () => onUpdate(readFormValues(form)),
     'onUpdateWorkout',

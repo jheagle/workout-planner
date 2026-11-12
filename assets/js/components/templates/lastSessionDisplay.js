@@ -1,5 +1,5 @@
-/* global jsonDomComponents */
-const { div, text } = jsonDomComponents
+/* global treeloomComponents */
+const { div, text } = treeloomComponents
 
 export const formatLastSession = (session) => session
   ? `Last time: ${session.weight_effort || 'no weight recorded'}, ${session.sets}x${session.reps} on ${session.date}`

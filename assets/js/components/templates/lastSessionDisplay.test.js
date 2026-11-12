@@ -1,8 +1,8 @@
-// formatLastSession is pure, but importing this module also destructures the jsonDomComponents global at the
+// formatLastSession is pure, but importing this module also destructures the treeloomComponents global at the
 // top level (for the DomItem-building lastSessionDisplay export this file doesn't test) - a lightweight stub is
 // enough, no need to load the real package. require(), not import, so this assignment actually runs first -
 // import statements are hoisted ahead of any other top-level code, which would run too late here.
-global.jsonDomComponents = { div: () => {}, text: () => {} }
+global.treeloomComponents = { div: () => {}, text: () => {} }
 const { formatLastSession } = require('./lastSessionDisplay.js')
 
 describe('formatLastSession', () => {

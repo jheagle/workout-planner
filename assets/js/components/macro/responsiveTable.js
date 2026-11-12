@@ -1,5 +1,5 @@
-/* global jsonDomComponents */
-const { table, tableBody, tableData, tableHead, tableHeading, tableRow, text, style } = jsonDomComponents
+/* global treeloomComponents */
+const { table, tableBody, tableData, tableHead, tableHeading, tableRow, text, style } = treeloomComponents
 
 const tableStyle = '/* \n' +
   'Max width before this PARTICULAR table gets nasty\n' +
