@@ -2036,6 +2036,10 @@ var workoutPlanner = (() => {
         const weekAgo = todayNumber - 7;
         workoutsWithMuscles.forEach((workout) => {
           const workoutDate = dayNumber(workout.date);
+          if (workoutDate > todayNumber) {
+            return;
+          }
+          ;
           (workout.muscles || []).forEach((muscle) => {
             const stat = stats[muscle._id];
             if (!stat) {

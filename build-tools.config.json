@@ -28,6 +28,7 @@
     "to": "browser/img"
   },
   "readme": {
+    "enabled": true,
     "from": [
       "assets/js/**/!(*.test).js"
     ]
