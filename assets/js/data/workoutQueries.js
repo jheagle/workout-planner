@@ -8,9 +8,24 @@ const { quoteId, getMusclePriority, getExercisesForMuscle, getLastSession } = cr
 export { getMusclePriority, getExercisesForMuscle, getLastSession }
 
 /**
- * Log a new workout entry.
+ * A weight as query assignments: the amount as decimal text (json-fs-query has no decimal type) and its unit. An
+ * empty or missing amount assigns nothing, unless `clear` is set (an update clearing the weight).
+ * @param {(number|string|undefined)} weight
+ * @param {string} unit
+ * @param {boolean} [clear=false]
+ * @returns {string[]}
+ */
+const weightAssignments = (weight, unit, clear = false) => {
+  if (weight === undefined || weight === null || weight === '') return clear ? ['weight = null', 'unit = null'] : []
+  return [`weight = ${quote(String(Number(weight)))}`, `unit = ${quote(unit === 'kg' ? 'kg' : 'lbs')}`]
+}
+
+/**
+ * Log a new workout entry. The weight is stored as entered, in the unit the equipment shows.
  * @param exerciseId
- * @param weightEffort
+ * @param weight - the amount, e.g. 67.5 (optional: bodyweight and holds have none)
+ * @param unit - 'kg' or 'lbs'
+ * @param seconds - a timed hold's length (optional)
  * @param sets
  * @param reps
  * @param note
@@ -19,34 +34,41 @@ export { getMusclePriority, getExercisesForMuscle, getLastSession }
  */
 export const logWorkout = async ({
   exerciseId,
-  weightEffort = '',
+  weight,
+  unit = 'lbs',
+  seconds,
   sets,
   reps,
   note = '',
   date = localDate(),
   order = 0
 }) => {
-  const queryString = 'insert workouts values ' +
-    `exercise_id = ${quoteId(exerciseId)}, ` +
-    `weight_effort = ${quote(weightEffort)}, ` +
-    `sets = ${sets}, ` +
-    `reps = ${reps}, ` +
-    `note = ${quote(note)}, ` +
-    `order = ${order}, ` +
+  const values = [
+    `exercise_id = ${quoteId(exerciseId)}`,
+    ...weightAssignments(weight, unit),
+    `sets = ${sets}`,
+    `reps = ${reps}`,
+    `note = ${quote(note)}`,
+    `order = ${order}`,
     `date = '${date}'`
-  const [rows] = await query(queryString)
+  ]
+  if (seconds !== undefined && seconds !== null && seconds !== '') values.push(`seconds = ${Number(seconds)}`)
+  const [rows] = await query(`insert workouts values ${values.join(', ')}`)
   return rows[0]
 }
 
 /**
  * Update an existing workout entry - e.g. correcting the plan with what was actually done.
  * @param workoutId
- * @param changes - any subset of weightEffort/sets/reps/note to change
+ * @param changes - any subset of weight (with unit)/seconds/sets/reps/note to change; an empty weight clears it
  */
-export const updateWorkout = async (workoutId, { weightEffort, sets, reps, note } = {}) => {
+export const updateWorkout = async (workoutId, { weight, unit, seconds, sets, reps, note } = {}) => {
   const assignments = []
-  if (typeof weightEffort !== 'undefined') {
-    assignments.push(`weight_effort = ${quote(weightEffort)}`)
+  if (typeof weight !== 'undefined') {
+    assignments.push(...weightAssignments(weight, unit, true))
+  }
+  if (typeof seconds !== 'undefined') {
+    assignments.push(seconds === null || seconds === '' ? 'seconds = null' : `seconds = ${Number(seconds)}`)
   }
   if (typeof sets !== 'undefined') {
     assignments.push(`sets = ${sets}`)
