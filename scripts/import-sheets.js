@@ -12,11 +12,11 @@
  * --replace first deletes every workout dated on or after the sheets' earliest date, so the sheets are imported
  * fresh: use it after a change to how cells are read. Workouts before that date (the 2024 seed) are kept.
  *
- * It prints a report: what was added, every cell it couldn't fully read (their text is kept in the workout's note),
- * and the equipment it guessed, for review.
+ * It packs the database at the end (database/__packed/, which the page reads). It prints a report: what was added,
+ * every cell it couldn't fully read (their text is kept in the workout's note), and the equipment it guessed, for review.
  */
 import fs from 'fs'
-import { configure, query, quote } from 'json-fs-query'
+import { configure, packDatabase, query, quote } from 'json-fs-query'
 import { parseSheet, nameKey, guessEquipment } from '../assets/js/data/sheetImport.js'
 
 /** Existing exercises whose stored names differ from the sheets' (stored name -> sheet name). */
@@ -180,6 +180,9 @@ const run = async () => {
     if (workout.note) values.push(`note = ${quote(workout.note)}`)
     await query(`insert workouts values ${values.join(', ')}`)
   }
+
+  // Repack, so the page reads each record in one request instead of every entry file
+  if (!dryRun) await packDatabase()
 
   console.log(`${dryRun ? 'Dry run: would add' : 'Added'} ${report.exercisesAdded.length} exercises and ${report.workoutsAdded} workouts (${report.workoutsSkipped} already stored, skipped).`)
   if (report.workoutsReplaced !== undefined) console.log(`${dryRun ? 'Would replace' : 'Replaced'} ${report.workoutsReplaced} workouts dated ${earliest} or later.`)

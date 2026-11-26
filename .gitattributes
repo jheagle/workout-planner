@@ -1,2 +1,3 @@
 * text=auto eol=lf
 browser/** linguist-generated=true
+database/** linguist-generated=true

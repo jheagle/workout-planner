@@ -76,11 +76,16 @@ API server and the tests) or the browser build&#39;s (browserReads.js, for the p
 origin over fetch()). Reads need no server; only writes do.</p>
 </dd>
 <dt><a href="#musclePriority">musclePriority</a></dt>
-<dd><p>Rank muscles by how much they need attention right now, from a real read of the database:
-every muscle (including ones never worked at all), and every workout row with its muscles
-already joined on (see workout()/musclePriority.test.js for the exact query shape this expects).
-A muscle needs priority once it&#39;s past its recovery window, or hasn&#39;t been worked often enough
-this week yet - whichever muscle has gone longest without being worked sorts first.</p>
+<dd><p>Rank muscles by how much they need attention right now, from a real read of the database: every muscle (including
+ones never worked at all), and every workout row with the muscles its exercise works.</p>
+<p>Work is counted in weighted sets: a workout row&#39;s sets times the muscle&#39;s share of the exercise (rank / 100), so 3
+sets of bench press give the mid and lower chest 3 and the front deltoid 1.5. A muscle counts as worked on a day
+with at least WORKED_DAY_SETS weighted sets. It needs priority when it has recovered (RECOVERY_DAYS since it was
+last worked, or never worked) and is still short of the weekly target in the last 7 days. Muscles needing priority
+sort first, the biggest shortfall first, then the longest since worked.</p>
+<p>A muscle split into regions (Pectorals: upper chest, mid and lower chest) is ranked by its regions, since exercises
+link to those: the muscle itself isn&#39;t listed, and each region&#39;s name starts with the muscle&#39;s (<code>group</code> is the
+muscle&#39;s name, for grouping).</p>
 </dd>
 <dt><a href="#localDate">localDate</a></dt>
 <dd><p>A date as &#39;YYYY-MM-DD&#39; in the machine&#39;s own timezone - the shape every workout&#39;s date uses. Not
@@ -500,7 +505,7 @@ Rank every muscle by how much it needs attention right now, from a real read of 
 <a name="createReads..getExercisesForMuscle"></a>
 
 ### createReads~getExercisesForMuscle(muscleId)
-Every exercise linked to a given muscle, via exercise_muscle.
+Every exercise linked to a given muscle, via exercise_muscle, the biggest share of the work first.
 
 **Kind**: inner method of [<code>createReads</code>](#createReads)  
 
@@ -522,19 +527,27 @@ The most recently logged workout for a given exercise, or null if it's never bee
 <a name="musclePriority"></a>
 
 ## musclePriority
-Rank muscles by how much they need attention right now, from a real read of the database:
-every muscle (including ones never worked at all), and every workout row with its muscles
-already joined on (see workout()/musclePriority.test.js for the exact query shape this expects).
-A muscle needs priority once it's past its recovery window, or hasn't been worked often enough
-this week yet - whichever muscle has gone longest without being worked sorts first.
+Rank muscles by how much they need attention right now, from a real read of the database: every muscle (including
+ones never worked at all), and every workout row with the muscles its exercise works.
+
+Work is counted in weighted sets: a workout row's sets times the muscle's share of the exercise (rank / 100), so 3
+sets of bench press give the mid and lower chest 3 and the front deltoid 1.5. A muscle counts as worked on a day
+with at least WORKED_DAY_SETS weighted sets. It needs priority when it has recovered (RECOVERY_DAYS since it was
+last worked, or never worked) and is still short of the weekly target in the last 7 days. Muscles needing priority
+sort first, the biggest shortfall first, then the longest since worked.
+
+A muscle split into regions (Pectorals: upper chest, mid and lower chest) is ranked by its regions, since exercises
+link to those: the muscle itself isn't listed, and each region's name starts with the muscle's (`group` is the
+muscle's name, for grouping).
 
 **Kind**: global constant  
 
-| Param | Description |
-| --- | --- |
-| muscles | every row from `read muscles` |
-| workoutsWithMuscles | every row from the workouts-joined-to-muscles query, each carrying a `.muscles` array (the muscles that workout's exercise worked) |
-| today | injectable for testing; defaults to the real current time (only its local date counts). Workouts dated after it are ignored A muscle split into regions (Pectorals: upper chest, mid and lower chest) is ranked by its regions, since exercises link to those: the muscle itself isn't listed, and each region's name starts with the muscle's. |
+| Param | Type | Description |
+| --- | --- | --- |
+| muscles |  | every row from `read muscles` |
+| workoutsWithMuscles |  | workout rows, each with `sets` (a row without it counts as 1 set) and a `.muscles` array: each muscle's `_id` and `rank` (0-100; a muscle without a rank counts as 100) |
+| today |  | injectable for testing; defaults to the real current time (only its local date counts). Workouts dated after it are ignored |
+| [options] | <code>Object</code> | weeklyTarget: weighted sets per muscle per week (default 10) |
 
 <a name="localDate"></a>
 
@@ -564,7 +577,7 @@ Generates a table ranking muscles by how much they need attention right now.
 
 | Param | Type | Description |
 | --- | --- | --- |
-| priorityRows | <code>Array</code> | musclePriority()'s shape: [{ muscleId, name, daysSinceLastWorked, timesWorkedThisWeek, needsPriority }] |
+| priorityRows | <code>Array</code> | musclePriority()'s shape: [{ muscleId, name, daysSinceLastWorked, weeklySets, weeklyTarget, needsPriority }] |
 
 <a name="logWorkoutForm"></a>
 

@@ -1,10 +1,10 @@
 /**
  * Write the muscle map (assets/js/data/muscleMap.js) into database/: the muscles and their regions, and every mapped
- * exercise's muscles with their share of the work. Running it again changes nothing.
+ * exercise's muscles with their share of the work. Running it again changes nothing. Packs the database at the end.
  *
  *   node scripts/apply-muscle-map.js [--database database/]
  */
-import { configure, query, quote } from 'json-fs-query'
+import { configure, packDatabase, query, quote } from 'json-fs-query'
 import { applyMuscleMap } from '../assets/js/data/muscleMap.js'
 
 const args = process.argv.slice(2)
@@ -12,6 +12,8 @@ const index = args.indexOf('--database')
 configure({ databasePath: index === -1 ? 'database/' : args[index + 1] })
 
 applyMuscleMap(query, quote)
+  // Repack, so the page reads each record in one request instead of every entry file
+  .then(report => packDatabase().then(() => report))
   .then(report => {
     console.log(`Muscles: ${report.musclesAdded.length} added, ${report.musclesUpdated.length} updated.`)
     if (report.musclesUpdated.length) console.log(`  Updated: ${report.musclesUpdated.join(', ')}`)
