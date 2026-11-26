@@ -26,10 +26,16 @@ const dayNumber = (date) => {
  * a `.muscles` array (the muscles that workout's exercise worked)
  * @param today - injectable for testing; defaults to the real current time (only its local date counts). Workouts
  * dated after it are ignored
+ *
+ * A muscle split into regions (Pectorals: upper chest, mid and lower chest) is ranked by its regions, since exercises
+ * link to those: the muscle itself isn't listed, and each region's name starts with the muscle's.
  */
 export const musclePriority = (muscles = [], workoutsWithMuscles = [], today = new Date()) => {
   const stats = {}
+  const parentIds = new Set(muscles.filter(muscle => muscle.parent_id).map(muscle => String(muscle.parent_id)))
+  const byId = new Map(muscles.map(muscle => [String(muscle._id), muscle]))
   muscles.forEach(muscle => {
+    if (parentIds.has(String(muscle._id))) return
     stats[muscle._id] = { muscle, lastWorkedDate: null, datesThisWeek: new Set() }
   })
 
@@ -63,9 +69,10 @@ export const musclePriority = (muscles = [], workoutsWithMuscles = [], today = n
         ? todayNumber - lastWorkedDate
         : Infinity
       const timesWorkedThisWeek = datesThisWeek.size
+      const parent = muscle.parent_id ? byId.get(String(muscle.parent_id)) : null
       return {
         muscleId: muscle._id,
-        name: muscle.name,
+        name: parent ? `${parent.name}: ${muscle.name}` : muscle.name,
         daysSinceLastWorked,
         timesWorkedThisWeek,
         needsPriority: daysSinceLastWorked >= RECOVERY_DAYS || timesWorkedThisWeek < TARGET_TIMES_PER_WEEK
