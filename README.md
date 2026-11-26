@@ -6,16 +6,24 @@ Plan daily and weekly workouts based on goals and muscle groups.
 
 ## Data
 
-The workout history lives in `database/` (json-fs-query records). Two scripts fill it:
+The workout history lives in `database/` (json-fs-query records). Weights are stored as entered, in the unit the
+equipment shows (`weight` and `unit`, kg or lbs), and the page shows them in the viewer's unit. Three scripts fill it:
 
 - `node scripts/import-sheets.js upper=<csv> lower=<csv> core=<csv> [--replace] [--dry-run]` imports the history from
   the Google Sheets CSV exports. `--replace` re-imports the sheets' date range from scratch.
+- `node scripts/migrate.js` runs the database migrations that haven't run yet (`assets/js/data/migrations.js`).
 - `node scripts/apply-muscle-map.js` writes the muscle map (`assets/js/data/muscleMap.js`) into `database/`: the
   muscles, their regions, and each exercise's share of the work per muscle.
 
 ## Modules
 
 <dl>
+<dt><a href="#module_units">units</a></dt>
+<dd><p>Weights in kg or lbs, and timed holds. A workout stores its weight as entered, in the unit the equipment shows
+(<code>weight</code> as decimal text, since json-fs-query has no decimal type, and <code>unit</code>), and every weight is shown in the
+viewer&#39;s preferred unit, with the entered value kept alongside. Holds are whole <code>seconds</code>. WP-8, 2026-11-26: most
+gym equipment here is in lbs, while Joshua thinks in kg.</p>
+</dd>
 <dt><a href="#module_sheetImport">sheetImport</a></dt>
 <dd><p>Importing Joshua&#39;s workout history from his Google Sheets (&quot;Workout Progress - Upper Body / Lower Body / Core&quot;,
 exported as CSV). Each sheet is a grid: the first row is session dates (newest first), each later row an exercise,
@@ -42,13 +50,18 @@ RDLs, standing presses): abs, obliques and erector spinae get about 20.</li>
 <li>An exercise is mapped for its usual form (cable cross: high to low).</li>
 </ul>
 </dd>
+<dt><a href="#module_migrations">migrations</a></dt>
+<dd><p>Changes to the database&#39;s records, in order. Each one checks whether it has already run, so <code>migrate()</code> can be run
+any time: on database/ by scripts/migrate.js, and on every test database (testDatabase.js), so tests always see
+the current schema even before database/ has been migrated.</p>
+</dd>
 </dl>
 
 ## Constants
 
 <dl>
 <dt><a href="#logWorkout">logWorkout</a></dt>
-<dd><p>Log a new workout entry.</p>
+<dd><p>Log a new workout entry. The weight is stored as entered, in the unit the equipment shows.</p>
 </dd>
 <dt><a href="#updateWorkout">updateWorkout</a></dt>
 <dd><p>Update an existing workout entry - e.g. correcting the plan with what was actually done.</p>
@@ -67,7 +80,7 @@ which changes with every workout logged.</p>
 </dd>
 <dt><a href="#createTestDatabase">createTestDatabase</a> ⇒ <code>Promise.&lt;Object.&lt;string, Array.&lt;Object&gt;&gt;&gt;</code></dt>
 <dd><p>Build a test database at destination: every record the real database has, with the same fields and keys (read
-from its record files, so a schema change reaches the tests), holding only the given rows. Configures
+from its record files, so a schema change reaches the tests, then migrated), holding only the given rows. Configures
 json-fs-query to use it.</p>
 </dd>
 <dt><a href="#createReads">createReads</a> ⇒ <code>Object</code></dt>
@@ -100,13 +113,19 @@ west of UTC (21:30 in Toronto is 01:30 UTC).</p>
 </dd>
 <dt><a href="#logWorkoutForm">logWorkoutForm</a> ⇒ <code>Object</code></dt>
 <dd><p>Builds the log-workout form&#39;s DOM structure. No event wiring here - see exercisePicker.js&#39;s
-own note on why that has to happen after this is attached into the real document and rendered.</p>
+own note on why that has to happen after this is attached into the real document and rendered.
+The weight is entered in the unit the equipment shows (the unit picker starts on the exercise&#39;s last unit).</p>
 </dd>
 <dt><a href="#readFormValues">readFormValues</a></dt>
-<dd><p>Reads the form&#39;s current field values, independent of which button triggered it.</p>
+<dd><p>Reads the form&#39;s current field values, independent of which button triggered it. A hold&#39;s time (&#39;0:45&#39;, &#39;45s&#39;)
+becomes seconds.</p>
 </dd>
 <dt><a href="#wireLogWorkoutFormEvents">wireLogWorkoutFormEvents</a></dt>
 <dd><p>Wires the form&#39;s submit and update buttons - see logWorkoutForm&#39;s own note on timing.</p>
+</dd>
+<dt><a href="#formatLastSession">formatLastSession</a> ⇒ <code>string</code></dt>
+<dd><p>A session in one line, its weight in the viewer&#39;s unit and, when the equipment&#39;s unit differs, the weight as
+entered in brackets: &quot;Last time: 81.6 kg (180 lbs), 3x10 on 2024-06-05&quot;. A hold shows its time instead.</p>
 </dd>
 <dt><a href="#lastSessionDisplay">lastSessionDisplay</a> ⇒ <code>DomItem</code></dt>
 <dd></dd>
@@ -141,12 +160,132 @@ needs no dynamic add/remove row UI to support picking several of each.</p>
 ## Functions
 
 <dl>
+<dt><a href="#weightAssignments">weightAssignments(weight, unit, [clear])</a> ⇒ <code>Array.&lt;string&gt;</code></dt>
+<dd><p>A weight as query assignments: the amount as decimal text (json-fs-query has no decimal type) and its unit. An
+empty or missing amount assigns nothing, unless <code>clear</code> is set (an update clearing the weight).</p>
+</dd>
 <dt><a href="#dayNumber">dayNumber(date)</a></dt>
 <dd><p>A &#39;YYYY-MM-DD&#39; date as a whole day number, so two dates are compared as calendar days, never as moments: a
 workout&#39;s date has no time of day, and new Date(&#39;YYYY-MM-DD&#39;) is midnight UTC, which in the evening west of UTC
 is already more than a day before the local &quot;now&quot; (21:30 in Toronto counted yesterday&#39;s workout as 2 days ago).</p>
 </dd>
 </dl>
+
+<a name="module_units"></a>
+
+## units
+Weights in kg or lbs, and timed holds. A workout stores its weight as entered, in the unit the equipment shows
+(`weight` as decimal text, since json-fs-query has no decimal type, and `unit`), and every weight is shown in the
+viewer's preferred unit, with the entered value kept alongside. Holds are whole `seconds`. WP-8, 2026-11-26: most
+gym equipment here is in lbs, while Joshua thinks in kg.
+
+
+* [units](#module_units)
+    * [.KG_PER_LB](#module_units.KG_PER_LB)
+    * [.WEIGHT_UNITS](#module_units.WEIGHT_UNITS)
+    * [.convertWeight](#module_units.convertWeight) ⇒ <code>number</code>
+    * [.formatAmount](#module_units.formatAmount) ⇒ <code>string</code>
+    * [.workoutWeight](#module_units.workoutWeight) ⇒ <code>Object</code> \| <code>null</code>
+    * [.readWeightText](#module_units.readWeightText) ⇒ <code>Object</code>
+    * [.showWeight](#module_units.showWeight) ⇒ <code>Object</code> \| <code>null</code>
+    * [.formatSeconds](#module_units.formatSeconds) ⇒ <code>string</code>
+    * [.defaultUnit](#module_units.defaultUnit) ⇒ <code>string</code>
+
+<a name="module_units.KG_PER_LB"></a>
+
+### units.KG\_PER\_LB
+One pound in kilograms (exact, by definition).
+
+**Kind**: static constant of [<code>units</code>](#module_units)  
+<a name="module_units.WEIGHT_UNITS"></a>
+
+### units.WEIGHT\_UNITS
+The units a weight can be in.
+
+**Kind**: static constant of [<code>units</code>](#module_units)  
+<a name="module_units.convertWeight"></a>
+
+### units.convertWeight ⇒ <code>number</code>
+A weight in another unit, unrounded.
+
+**Kind**: static constant of [<code>units</code>](#module_units)  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| amount | <code>number</code> |  |
+| from | <code>string</code> | 'kg' or 'lbs' |
+| to | <code>string</code> | 'kg' or 'lbs' |
+
+<a name="module_units.formatAmount"></a>
+
+### units.formatAmount ⇒ <code>string</code>
+A number for people: at most one decimal, none when it's whole (67.5, 30.6, 225).
+
+**Kind**: static constant of [<code>units</code>](#module_units)  
+
+| Param | Type |
+| --- | --- |
+| amount | <code>number</code> | 
+
+<a name="module_units.workoutWeight"></a>
+
+### units.workoutWeight ⇒ <code>Object</code> \| <code>null</code>
+A workout's weight, or null when it has none: `weight` and `unit`, or the old `weight_effort` text ('180lbs',
+'2x40lbs', which is 80 lbs), so rows from before the change still read.
+
+**Kind**: static constant of [<code>units</code>](#module_units)  
+
+| Param | Type |
+| --- | --- |
+| workout | <code>Object</code> | 
+
+<a name="module_units.readWeightText"></a>
+
+### units.readWeightText ⇒ <code>Object</code>
+The old `weight_effort` text read as a weight or a hold: '180lbs', '2x40lbs' (two 40s: 80 lbs), '0:30', '2:00',
+'30 seconds'. Anything else reads as neither.
+
+**Kind**: static constant of [<code>units</code>](#module_units)  
+
+| Param | Type |
+| --- | --- |
+| text | <code>string</code> | 
+
+<a name="module_units.showWeight"></a>
+
+### units.showWeight ⇒ <code>Object</code> \| <code>null</code>
+A weight shown in the viewer's unit: '81.6 kg'. When that isn't the unit it was entered in, `entered` is the
+original ('180 lbs'), to show alongside.
+
+**Kind**: static constant of [<code>units</code>](#module_units)  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| weight | <code>Object</code> \| <code>null</code> |  |
+| preferredUnit | <code>string</code> | 'kg' or 'lbs' |
+
+<a name="module_units.formatSeconds"></a>
+
+### units.formatSeconds ⇒ <code>string</code>
+Seconds as a clock: 30 is '0:30', 125 is '2:05'.
+
+**Kind**: static constant of [<code>units</code>](#module_units)  
+
+| Param | Type |
+| --- | --- |
+| seconds | <code>number</code> | 
+
+<a name="module_units.defaultUnit"></a>
+
+### units.defaultUnit ⇒ <code>string</code>
+A starting unit for someone who hasn't chosen one: lbs where it's the everyday unit (the US, Liberia, Myanmar),
+kg everywhere else.
+
+**Kind**: static constant of [<code>units</code>](#module_units)  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| [locale] | <code>string</code> | e.g. 'en-US' |
 
 <a name="module_sheetImport"></a>
 
@@ -381,17 +520,63 @@ of it (to the nearest 10).
 | --- | --- |
 | share | <code>number</code> | 
 
+<a name="module_migrations"></a>
+
+## migrations
+Changes to the database's records, in order. Each one checks whether it has already run, so `migrate()` can be run
+any time: on database/ by scripts/migrate.js, and on every test database (testDatabase.js), so tests always see
+the current schema even before database/ has been migrated.
+
+
+* [migrations](#module_migrations)
+    * _static_
+        * [.migrations](#module_migrations.migrations) : <code>Array.&lt;{name: string, applied: function(function()): Promise.&lt;boolean&gt;, up: function(function(), function()): Promise.&lt;Object&gt;}&gt;</code>
+        * [.migrate](#module_migrations.migrate) ⇒ <code>Promise.&lt;Array.&lt;{name: string, result: Object}&gt;&gt;</code>
+    * _inner_
+        * [~fieldsOf(query, record)](#module_migrations..fieldsOf) ⇒ <code>Promise.&lt;Array.&lt;string&gt;&gt;</code>
+
+<a name="module_migrations.migrations"></a>
+
+### migrations.migrations : <code>Array.&lt;{name: string, applied: function(function()): Promise.&lt;boolean&gt;, up: function(function(), function()): Promise.&lt;Object&gt;}&gt;</code>
+**Kind**: static constant of [<code>migrations</code>](#module_migrations)  
+<a name="module_migrations.migrate"></a>
+
+### migrations.migrate ⇒ <code>Promise.&lt;Array.&lt;{name: string, result: Object}&gt;&gt;</code>
+Run every migration that hasn't run yet, in order.
+
+**Kind**: static constant of [<code>migrations</code>](#module_migrations)  
+**Returns**: <code>Promise.&lt;Array.&lt;{name: string, result: Object}&gt;&gt;</code> - the migrations that ran, with what each reported  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| query | <code>function</code> | json-fs-query's query, configured for the database |
+| quote | <code>function</code> | json-fs-query's quote |
+
+<a name="module_migrations..fieldsOf"></a>
+
+### migrations~fieldsOf(query, record) ⇒ <code>Promise.&lt;Array.&lt;string&gt;&gt;</code>
+The fields of a record.
+
+**Kind**: inner method of [<code>migrations</code>](#module_migrations)  
+
+| Param | Type |
+| --- | --- |
+| query | <code>function</code> | 
+| record | <code>string</code> | 
+
 <a name="logWorkout"></a>
 
 ## logWorkout
-Log a new workout entry.
+Log a new workout entry. The weight is stored as entered, in the unit the equipment shows.
 
 **Kind**: global constant  
 
 | Param | Description |
 | --- | --- |
 | exerciseId |  |
-| weightEffort |  |
+| weight | the amount, e.g. 67.5 (optional: bodyweight and holds have none) |
+| unit | 'kg' or 'lbs' |
+| seconds | a timed hold's length (optional) |
 | sets |  |
 | reps |  |
 | note |  |
@@ -408,7 +593,7 @@ Update an existing workout entry - e.g. correcting the plan with what was actual
 | Param | Description |
 | --- | --- |
 | workoutId |  |
-| changes | any subset of weightEffort/sets/reps/note to change |
+| changes | any subset of weight (with unit)/seconds/sets/reps/note to change; an empty weight clears it |
 
 <a name="addExercise"></a>
 
@@ -447,7 +632,7 @@ which changes with every workout logged.
 
 ## createTestDatabase ⇒ <code>Promise.&lt;Object.&lt;string, Array.&lt;Object&gt;&gt;&gt;</code>
 Build a test database at destination: every record the real database has, with the same fields and keys (read
-from its record files, so a schema change reaches the tests), holding only the given rows. Configures
+from its record files, so a schema change reaches the tests, then migrated), holding only the given rows. Configures
 json-fs-query to use it.
 
 **Kind**: global constant  
@@ -584,12 +769,14 @@ Generates a table ranking muscles by how much they need attention right now.
 ## logWorkoutForm ⇒ <code>Object</code>
 Builds the log-workout form's DOM structure. No event wiring here - see exercisePicker.js's
 own note on why that has to happen after this is attached into the real document and rendered.
+The weight is entered in the unit the equipment shows (the unit picker starts on the exercise's last unit).
 
 **Kind**: global constant  
 <a name="readFormValues"></a>
 
 ## readFormValues
-Reads the form's current field values, independent of which button triggered it.
+Reads the form's current field values, independent of which button triggered it. A hold's time ('0:45', '45s')
+becomes seconds.
 
 **Kind**: global constant  
 
@@ -607,17 +794,31 @@ Wires the form's submit and update buttons - see logWorkoutForm's own note on ti
 | Param | Type | Description |
 | --- | --- | --- |
 | form | <code>Object</code> |  |
-| onSubmit | <code>function</code> | ({ weightEffort, sets, reps, note, date }) => void, logs a brand new entry |
-| onUpdate | <code>function</code> | ({ weightEffort, sets, reps, note, date }) => void, corrects the most recently shown entry |
+| onSubmit | <code>function</code> | ({ weight, unit, seconds, sets, reps, note, date }) => void, logs a brand new entry |
+| onUpdate | <code>function</code> | ({ weight, unit, seconds, sets, reps, note, date }) => void, corrects the most recently shown entry |
+
+<a name="formatLastSession"></a>
+
+## formatLastSession ⇒ <code>string</code>
+A session in one line, its weight in the viewer's unit and, when the equipment's unit differs, the weight as
+entered in brackets: "Last time: 81.6 kg (180 lbs), 3x10 on 2024-06-05". A hold shows its time instead.
+
+**Kind**: global constant  
+
+| Param | Type | Default | Description |
+| --- | --- | --- | --- |
+| session | <code>Object</code> \| <code>null</code> |  | getLastSession()'s shape, or null if never logged |
+| [preferredUnit] | <code>string</code> | <code>&quot;&#x27;kg&#x27;&quot;</code> | 'kg' or 'lbs' |
 
 <a name="lastSessionDisplay"></a>
 
 ## lastSessionDisplay ⇒ <code>DomItem</code>
 **Kind**: global constant  
 
-| Param | Type | Description |
-| --- | --- | --- |
-| session | <code>Object</code> \| <code>null</code> | getLastSession()'s shape, or null if never logged |
+| Param | Type | Default | Description |
+| --- | --- | --- | --- |
+| session | <code>Object</code> \| <code>null</code> |  | getLastSession()'s shape, or null if never logged |
+| [preferredUnit] | <code>string</code> | <code>&quot;&#x27;kg&#x27;&quot;</code> | 'kg' or 'lbs' |
 
 <a name="exercisePicker"></a>
 
@@ -697,6 +898,20 @@ Generates a menu with the provided index as the currently selected item.
 | tableRows | <code>Array</code> | 
 | tableHeadings | <code>Array</code> | 
 | tableClass | <code>string</code> | 
+
+<a name="weightAssignments"></a>
+
+## weightAssignments(weight, unit, [clear]) ⇒ <code>Array.&lt;string&gt;</code>
+A weight as query assignments: the amount as decimal text (json-fs-query has no decimal type) and its unit. An
+empty or missing amount assigns nothing, unless `clear` is set (an update clearing the weight).
+
+**Kind**: global function  
+
+| Param | Type | Default |
+| --- | --- | --- |
+| weight | <code>number</code> \| <code>string</code> \| <code>undefined</code> |  | 
+| unit | <code>string</code> |  | 
+| [clear] | <code>boolean</code> | <code>false</code> | 
 
 <a name="dayNumber"></a>
 

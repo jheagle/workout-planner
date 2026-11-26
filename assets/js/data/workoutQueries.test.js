@@ -50,7 +50,7 @@ describe('workoutQueries', () => {
   test('getLastSession finds the most recent real workout for an exercise', async () => {
     const session = await getLastSession(benchPress)
     expect(session.date).toBe('2024-06-05')
-    expect(session.weight_effort).toBe('120lbs')
+    expect([session.weight, session.unit]).toEqual(['120', 'lbs'])
   })
 
   test('getLastSession returns null for an exercise never logged', async () => {
@@ -61,30 +61,35 @@ describe('workoutQueries', () => {
   test('logWorkout inserts a new real entry, immediately visible to getLastSession', async () => {
     const logged = await logWorkout({
       exerciseId: benchPress,
-      weightEffort: '125lbs',
+      weight: 57.5,
+      unit: 'kg',
       sets: 3,
       reps: 8,
       date: '2024-06-12'
     })
-    expect(logged.weight_effort).toBe('125lbs')
+    expect([logged.weight, logged.unit]).toEqual(['57.5', 'kg'])
 
     const session = await getLastSession(benchPress)
     expect(session.date).toBe('2024-06-12')
-    expect(session.weight_effort).toBe('125lbs')
+    expect([session.weight, session.unit]).toEqual(['57.5', 'kg'])
+  })
+
+  test('logWorkout stores a timed hold in seconds, with no weight', async () => {
+    const logged = await logWorkout({ exerciseId: benchPress, seconds: 45, sets: 2, reps: 0, date: '2024-06-12' })
+    expect(logged.seconds).toBe(45)
+    expect(logged.weight).toBeUndefined()
   })
 
   test('logWorkout keeps free text exactly as typed, quotes and query syntax included', async () => {
     const note = "felt great, didn't even need a spotter; C:\\gym -- \"PR\" /* next */ [x]"
     const logged = await logWorkout({
       exerciseId: benchPress,
-      weightEffort: "bar + 2 25's",
       sets: 3,
       reps: 8,
       note,
       date: '2024-06-12'
     })
     expect(logged.note).toBe(note)
-    expect(logged.weight_effort).toBe("bar + 2 25's")
 
     const session = await getLastSession(benchPress)
     expect(session.note).toBe(note)
@@ -110,8 +115,8 @@ describe('workoutQueries', () => {
   })
 
   test('updateWorkout corrects an existing real entry', async () => {
-    const updated = await updateWorkout(firstWorkout, { weightEffort: '120lbs', reps: 12 })
-    expect(updated.weight_effort).toBe('120lbs')
+    const updated = await updateWorkout(firstWorkout, { weight: 55, unit: 'kg', reps: 12 })
+    expect([updated.weight, updated.unit]).toEqual(['55', 'kg'])
     expect(updated.reps).toBe(12)
     // untouched fields survive the update
     expect(updated.sets).toBe(3)

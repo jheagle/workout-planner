@@ -1,6 +1,7 @@
 import fs from 'fs/promises'
 import path from 'path'
 import { configure, create, query, quote } from './index.js'
+import { migrate } from './migrations.js'
 
 /**
  * A value that is the _id of the exercise with this name, once it's inserted: exercises' ids are generated on insert
@@ -43,12 +44,12 @@ export const seedRows = {
     { exercise_id: exercise('Squat'), muscle_id: '12', muscle_rank: 100 }
   ],
   workouts: [
-    { exercise_id: exercise('Bench Press'), weight_effort: '115lbs', reps: 10, sets: 3, note: '', order: 0, date: '2024-06-02' },
-    { exercise_id: exercise('Deadlift'), weight_effort: '155lbs', reps: 10, sets: 3, note: '', order: 1, date: '2024-06-02' },
-    { exercise_id: exercise('Squat'), weight_effort: '155lbs', reps: 10, sets: 3, note: '', order: 2, date: '2024-06-02' },
-    { exercise_id: exercise('Bench Press'), weight_effort: '120lbs', reps: 10, sets: 3, note: '', order: 0, date: '2024-06-05' },
-    { exercise_id: exercise('Deadlift'), weight_effort: '160lbs', reps: 10, sets: 3, note: '', order: 1, date: '2024-06-05' },
-    { exercise_id: exercise('Squat'), weight_effort: '160lbs', reps: 10, sets: 3, note: '', order: 2, date: '2024-06-05' }
+    { exercise_id: exercise('Bench Press'), weight: '115', unit: 'lbs', reps: 10, sets: 3, note: '', order: 0, date: '2024-06-02' },
+    { exercise_id: exercise('Deadlift'), weight: '155', unit: 'lbs', reps: 10, sets: 3, note: '', order: 1, date: '2024-06-02' },
+    { exercise_id: exercise('Squat'), weight: '155', unit: 'lbs', reps: 10, sets: 3, note: '', order: 2, date: '2024-06-02' },
+    { exercise_id: exercise('Bench Press'), weight: '120', unit: 'lbs', reps: 10, sets: 3, note: '', order: 0, date: '2024-06-05' },
+    { exercise_id: exercise('Deadlift'), weight: '160', unit: 'lbs', reps: 10, sets: 3, note: '', order: 1, date: '2024-06-05' },
+    { exercise_id: exercise('Squat'), weight: '160', unit: 'lbs', reps: 10, sets: 3, note: '', order: 2, date: '2024-06-05' }
   ]
 }
 
@@ -58,7 +59,7 @@ const toRow = (row, inserted) => `(${Object.entries(row).map(([field, value]) =>
 
 /**
  * Build a test database at destination: every record the real database has, with the same fields and keys (read
- * from its record files, so a schema change reaches the tests), holding only the given rows. Configures
+ * from its record files, so a schema change reaches the tests, then migrated), holding only the given rows. Configures
  * json-fs-query to use it.
  * @param {string} destination - The folder to create the test database in.
  * @param {Object<string, Array<Object>>} [rows=seedRows] - The rows to insert, by record, in an order that keeps the
@@ -73,6 +74,8 @@ export const createTestDatabase = async (destination, rows = seedRows, source = 
     const { path: name, definition, keys } = JSON.parse(await fs.readFile(path.join(source, file), 'utf8'))
     await create(name, definition, keys)
   }
+  // Bring the copied schema up to date, so tests see it as migrated even before database/ is
+  await migrate(query, quote)
   const inserted = {}
   for (const [record, list] of Object.entries(rows)) {
     inserted[record] = list.length

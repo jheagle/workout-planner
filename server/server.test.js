@@ -70,21 +70,21 @@ describe('workout-planner API', () => {
     const response = await fetch(`${baseUrl}/api/workouts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ exerciseId: benchPress, weightEffort: '125lbs', sets: 3, reps: 8, date: '2024-06-12' })
+      body: JSON.stringify({ exerciseId: benchPress, weight: 125, unit: 'lbs', sets: 3, reps: 8, date: '2024-06-12' })
     })
     expect(response.status).toBe(200)
     const body = await response.json()
-    expect(body.weight_effort).toBe('125lbs')
+    expect([body.weight, body.unit]).toEqual(['125', 'lbs'])
   })
 
   test('PATCH /api/workouts/:id updates a real entry', async () => {
     const response = await fetch(`${baseUrl}/api/workouts/${firstWorkout}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ weightEffort: '120lbs', reps: 12 })
+      body: JSON.stringify({ weight: 55, unit: 'kg', reps: 12 })
     })
     const body = await response.json()
-    expect(body.weight_effort).toBe('120lbs')
+    expect([body.weight, body.unit]).toEqual(['55', 'kg'])
     expect(body.reps).toBe(12)
   })
 
