@@ -21,18 +21,25 @@ export const createReads = ({ query, quote }) => {
    * @param today - injectable for testing; defaults to the real current time
    */
   const getMusclePriority = async (today = new Date()) => {
-    const [muscles] = await query('read muscles')
-    const joinQueryString = 'read workouts.muscles' +
-      ' on workouts.exercise_id = exercises._id' +
-      ' and on exercises._id = exercise_muscle.exercise_id' +
-      ' and on exercise_muscle.muscle_id = muscles._id' +
-      ' merge muscles._id with exercise_muscle.muscle_id'
-    const [workoutsWithMuscles] = await query(joinQueryString)
+    // Three whole reads, joined here: a join's `merge` of exercise_muscle picks the first link for each muscle across
+    // every exercise, not this exercise's, so the ranks came out wrong. With packed records it's three requests
+    const [[muscles], [workouts], [links]] = await Promise.all([
+      query('read muscles'),
+      query('read workouts'),
+      query('read exercise_muscle')
+    ])
+    const musclesByExercise = new Map()
+    links.forEach(link => {
+      const key = String(link.exercise_id)
+      if (!musclesByExercise.has(key)) musclesByExercise.set(key, [])
+      musclesByExercise.get(key).push({ _id: String(link.muscle_id), rank: link.muscle_rank })
+    })
+    const workoutsWithMuscles = workouts.map(workout => ({ ...workout, muscles: musclesByExercise.get(String(workout.exercise_id)) || [] }))
     return musclePriority(muscles, workoutsWithMuscles, today)
   }
 
   /**
-   * Every exercise linked to a given muscle, via exercise_muscle.
+   * Every exercise linked to a given muscle, via exercise_muscle, the biggest share of the work first.
    * @param muscleId
    */
   const getExercisesForMuscle = async (muscleId) => {
@@ -40,7 +47,11 @@ export const createReads = ({ query, quote }) => {
       ' on exercise_muscle.exercise_id = exercises._id' +
       ` where muscle_id = ${quoteId(muscleId)}`
     const [rows] = await query(queryString)
-    return rows.map(row => row.exercises[0])
+    // The exercises that work this muscle most come first
+    return rows
+      .filter(row => row.exercises.length)
+      .sort((first, second) => second.muscle_rank - first.muscle_rank || first.exercises[0].name.localeCompare(second.exercises[0].name))
+      .map(row => row.exercises[0])
   }
 
   /**

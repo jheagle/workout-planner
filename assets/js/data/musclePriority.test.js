@@ -24,12 +24,13 @@ describe('musclePriority', () => {
     expect(result.needsPriority).toBe(true)
   })
 
-  test('a muscle worked today, for the first time this week, still needs priority (under the 2x/week target)', () => {
+  test('a muscle worked today, still under the weekly target, is recovering: no priority yet', () => {
     const workouts = [workout('2024-06-10', [muscle(1, 'Chest')])]
     const [result] = musclePriority([muscle(1, 'Chest')], workouts, today)
     expect(result.daysSinceLastWorked).toBe(0)
     expect(result.timesWorkedThisWeek).toBe(1)
-    expect(result.needsPriority).toBe(true)
+    expect(result.weeklySets).toBe(1)
+    expect(result.needsPriority).toBe(false)
   })
 
   test('a muscle worked on two distinct days this week, most recently today, does not need priority', () => {
@@ -65,14 +66,48 @@ describe('musclePriority', () => {
     expect(result.needsPriority).toBe(false)
   })
 
-  test('a muscle past its recovery window needs priority even if it already met the weekly target', () => {
+  test('a muscle past its recovery window and under the weekly target needs priority', () => {
     const workouts = [
       workout('2024-06-05', [muscle(1, 'Chest')]),
       workout('2024-06-04', [muscle(1, 'Chest')])
     ]
     const [result] = musclePriority([muscle(1, 'Chest')], workouts, today)
     expect(result.daysSinceLastWorked).toBeGreaterThanOrEqual(3)
+    expect(result.weeklySets).toBe(2)
     expect(result.needsPriority).toBe(true)
+  })
+
+  test('a recovered muscle that already has its weekly weighted sets doesn\'t need priority', () => {
+    const workouts = [{ ...workout('2024-06-05', [muscle(1, 'Chest')]), sets: 6 }, { ...workout('2024-06-04', [muscle(1, 'Chest')]), sets: 4 }]
+    const [result] = musclePriority([muscle(1, 'Chest')], workouts, today)
+    expect(result.weeklySets).toBe(10)
+    expect(result.needsPriority).toBe(false)
+  })
+
+  test('work counts as sets times the muscle\'s share: 3 sets at 50% is 1.5 weighted sets', () => {
+    const workouts = [{ date: '2024-06-05', sets: 3, muscles: [{ _id: 1, rank: 100 }, { _id: 2, rank: 50 }] }]
+    const result = musclePriority([muscle(1, 'Chest'), muscle(2, 'Front deltoid')], workouts, today)
+    expect(result.find(row => row.muscleId === 1).weeklySets).toBe(3)
+    expect(result.find(row => row.muscleId === 2).weeklySets).toBe(1.5)
+  })
+
+  test('a day with less than one weighted set doesn\'t count as worked (no reset of recovery), but its sets still count', () => {
+    const workouts = [
+      { date: '2024-06-09', sets: 1, muscles: [{ _id: 1, rank: 30 }] },
+      { date: '2024-06-05', sets: 3, muscles: [{ _id: 1, rank: 100 }] }
+    ]
+    const [result] = musclePriority([muscle(1, 'Grip')], workouts, today)
+    expect(result.daysSinceLastWorked).toBe(5)
+    expect(result.timesWorkedThisWeek).toBe(1)
+    expect(result.weeklySets).toBe(3.3)
+    expect(result.needsPriority).toBe(true)
+  })
+
+  test('the weekly target can be changed', () => {
+    const workouts = [{ ...workout('2024-06-05', [muscle(1, 'Chest')]), sets: 6 }]
+    const [result] = musclePriority([muscle(1, 'Chest')], workouts, today, { weeklyTarget: 5 })
+    expect(result.weeklyTarget).toBe(5)
+    expect(result.needsPriority).toBe(false)
   })
 
   test('counts calendar days: late in the evening, yesterday\'s workout is 1 day ago, not 2 (dates used to be UTC midnight)', () => {
@@ -101,7 +136,7 @@ describe('musclePriority', () => {
     const [result] = musclePriority([muscle(1, 'Chest')], workouts, today)
     expect(result.daysSinceLastWorked).toBe(2)
     expect(result.timesWorkedThisWeek).toBe(1)
-    expect(result.needsPriority).toBe(true)
+    expect(result.weeklySets).toBe(1)
   })
 
   test('a muscle only worked after today counts as never worked', () => {
@@ -117,7 +152,7 @@ describe('musclePriority', () => {
     expect(result.find(row => row.muscleId === 2).daysSinceLastWorked).toBe(0)
   })
 
-  test('sorts muscles that need priority first, longest-neglected first, never-worked ahead of worked-long-ago', () => {
+  test('sorts muscles that need priority first, the biggest shortfall first, then the longest since worked', () => {
     const muscles = [muscle(1, 'NeverWorked'), muscle(2, 'WorkedLongAgo'), muscle(3, 'WorkedToday')]
     const workouts = [
       workout('2024-05-01', [muscle(2, 'WorkedLongAgo')]),

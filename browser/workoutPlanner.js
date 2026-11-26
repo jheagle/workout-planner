@@ -1781,6 +1781,11 @@ var workoutPlanner = (() => {
       exports.musclePriorityList = void 0;
       var _responsiveTable = require_responsiveTable();
       var formatDaysSinceWorked = (daysSinceLastWorked) => daysSinceLastWorked === Infinity || daysSinceLastWorked === null ? "Never" : `${daysSinceLastWorked}`;
+      var status = (row) => {
+        if (row.needsPriority) return "Needs priority";
+        if (row.weeklySets >= row.weeklyTarget) return "Target met";
+        return "Recovering";
+      };
       var musclePriorityList = (priorityRows = []) => (0, _responsiveTable.responsiveTable)(priorityRows.map((row) => ({
         data: [{
           text: row.name,
@@ -1789,10 +1794,10 @@ var workoutPlanner = (() => {
           text: formatDaysSinceWorked(row.daysSinceLastWorked),
           className: ""
         }, {
-          text: `${row.timesWorkedThisWeek}`,
+          text: `${row.weeklySets} / ${row.weeklyTarget}`,
           className: ""
         }, {
-          text: row.needsPriority ? "Needs priority" : "Recovered",
+          text: status(row),
           className: ""
         }],
         className: row.needsPriority ? "needs-priority" : ""
@@ -1803,7 +1808,7 @@ var workoutPlanner = (() => {
         text: "Days Since Worked",
         className: ""
       }, {
-        text: "Times This Week",
+        text: "Weighted Sets (7 days)",
         className: ""
       }, {
         text: "Status",
@@ -2018,12 +2023,15 @@ var workoutPlanner = (() => {
       var _localDate = require_localDate();
       var MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1e3;
       var RECOVERY_DAYS = 3;
-      var TARGET_TIMES_PER_WEEK = 2;
+      var WEEKLY_SET_TARGET = 10;
+      var WORKED_DAY_SETS = 1;
       var dayNumber = (date) => {
         const [year, month, day] = date.split("-").map(Number);
         return Date.UTC(year, month - 1, day) / MILLISECONDS_PER_DAY;
       };
-      var musclePriority = (muscles = [], workoutsWithMuscles = [], today = /* @__PURE__ */ new Date()) => {
+      var musclePriority = (muscles = [], workoutsWithMuscles = [], today = /* @__PURE__ */ new Date(), {
+        weeklyTarget = WEEKLY_SET_TARGET
+      } = {}) => {
         const stats = {};
         const parentIds = new Set(muscles.filter((muscle) => muscle.parent_id).map((muscle) => String(muscle.parent_id)));
         const byId = new Map(muscles.map((muscle) => [String(muscle._id), muscle]));
@@ -2031,8 +2039,7 @@ var workoutPlanner = (() => {
           if (parentIds.has(String(muscle._id))) return;
           stats[muscle._id] = {
             muscle,
-            lastWorkedDate: null,
-            datesThisWeek: /* @__PURE__ */ new Set()
+            setsByDay: /* @__PURE__ */ new Map()
           };
         });
         const todayNumber = dayNumber((0, _localDate.localDate)(today));
@@ -2042,38 +2049,41 @@ var workoutPlanner = (() => {
           if (workoutDate > todayNumber) {
             return;
           }
-          ;
+          const sets = workout.sets ?? 1;
           (workout.muscles || []).forEach((muscle) => {
             const stat = stats[muscle._id];
             if (!stat) {
               return;
             }
-            if (stat.lastWorkedDate === null || workoutDate > stat.lastWorkedDate) {
-              stat.lastWorkedDate = workoutDate;
-            }
-            if (workoutDate >= weekAgo) {
-              stat.datesThisWeek.add(workout.date);
-            }
+            const weighted = sets * (muscle.rank ?? 100) / 100;
+            stat.setsByDay.set(workoutDate, (stat.setsByDay.get(workoutDate) || 0) + weighted);
           });
         });
         return Object.values(stats).map(({
           muscle,
-          lastWorkedDate,
-          datesThisWeek
+          setsByDay
         }) => {
+          const workedDays = [...setsByDay].filter(([, sets]) => sets >= WORKED_DAY_SETS).map(([day]) => day);
+          const lastWorkedDate = workedDays.length ? Math.max(...workedDays) : null;
           const daysSinceLastWorked = lastWorkedDate !== null ? todayNumber - lastWorkedDate : Infinity;
-          const timesWorkedThisWeek = datesThisWeek.size;
+          const weeklySets = [...setsByDay].filter(([day]) => day >= weekAgo).reduce((total, [, sets]) => total + sets, 0);
           const parent = muscle.parent_id ? byId.get(String(muscle.parent_id)) : null;
           return {
             muscleId: muscle._id,
             name: parent ? `${parent.name}: ${muscle.name}` : muscle.name,
+            group: parent ? parent.name : muscle.name,
             daysSinceLastWorked,
-            timesWorkedThisWeek,
-            needsPriority: daysSinceLastWorked >= RECOVERY_DAYS || timesWorkedThisWeek < TARGET_TIMES_PER_WEEK
+            timesWorkedThisWeek: workedDays.filter((day) => day >= weekAgo).length,
+            weeklySets: Math.round(weeklySets * 10) / 10,
+            weeklyTarget,
+            needsPriority: daysSinceLastWorked >= RECOVERY_DAYS && weeklySets < weeklyTarget
           };
         }).sort((first, second) => {
           if (first.needsPriority !== second.needsPriority) {
             return first.needsPriority ? -1 : 1;
+          }
+          if (first.weeklySets !== second.weeklySets) {
+            return first.weeklySets - second.weeklySets;
           }
           return second.daysSinceLastWorked - first.daysSinceLastWorked;
         });
@@ -2098,15 +2108,26 @@ var workoutPlanner = (() => {
       }) => {
         const quoteId = (id) => id === void 0 || id === null ? id : quote(String(id));
         const getMusclePriority = async (today = /* @__PURE__ */ new Date()) => {
-          const [muscles] = await query("read muscles");
-          const joinQueryString = "read workouts.muscles on workouts.exercise_id = exercises._id and on exercises._id = exercise_muscle.exercise_id and on exercise_muscle.muscle_id = muscles._id merge muscles._id with exercise_muscle.muscle_id";
-          const [workoutsWithMuscles] = await query(joinQueryString);
+          const [[muscles], [workouts], [links]] = await Promise.all([query("read muscles"), query("read workouts"), query("read exercise_muscle")]);
+          const musclesByExercise = /* @__PURE__ */ new Map();
+          links.forEach((link) => {
+            const key = String(link.exercise_id);
+            if (!musclesByExercise.has(key)) musclesByExercise.set(key, []);
+            musclesByExercise.get(key).push({
+              _id: String(link.muscle_id),
+              rank: link.muscle_rank
+            });
+          });
+          const workoutsWithMuscles = workouts.map((workout) => ({
+            ...workout,
+            muscles: musclesByExercise.get(String(workout.exercise_id)) || []
+          }));
           return (0, _musclePriority.musclePriority)(muscles, workoutsWithMuscles, today);
         };
         const getExercisesForMuscle = async (muscleId) => {
           const queryString = `read exercise_muscle.exercises on exercise_muscle.exercise_id = exercises._id where muscle_id = ${quoteId(muscleId)}`;
           const [rows] = await query(queryString);
-          return rows.map((row) => row.exercises[0]);
+          return rows.filter((row) => row.exercises.length).sort((first, second) => second.muscle_rank - first.muscle_rank || first.exercises[0].name.localeCompare(second.exercises[0].name)).map((row) => row.exercises[0]);
         };
         const getLastSession = async (exerciseId) => {
           const queryString = `read workouts where exercise_id = ${quoteId(exerciseId)} sort date desc limit 1`;
