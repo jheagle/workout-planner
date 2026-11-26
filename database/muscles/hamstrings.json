@@ -1,1 +1,6 @@
-{"_id":8,"name":"Hamstrings","alias":"back of the thigh","image":""}
+{
+  "_id": 8,
+  "name": "Hamstrings",
+  "alias": "abs",
+  "image": ""
+}

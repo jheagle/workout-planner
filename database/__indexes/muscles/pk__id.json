@@ -1,1 +1,58 @@
-[{"value":1,"record":["abdominal.json"]},{"value":2,"record":["biceps.json"]},{"value":3,"record":["calves.json"]},{"value":4,"record":["deltoids.json"]},{"value":5,"record":["erector_spinae.json"]},{"value":6,"record":["forearms.json"]},{"value":7,"record":["gluteus_maximus.json"]},{"value":8,"record":["hamstrings.json"]},{"value":9,"record":["latissimus_dorsi.json"]},{"value":10,"record":["obliques.json"]},{"value":11,"record":["pectorals.json"]},{"value":12,"record":["quadriceps.json"]},{"value":13,"record":["trapezius.json"]},{"value":14,"record":["triceps.json"]},{"value":"gastrocnemius","record":["gastrocnemius.json"]},{"value":"soleus","record":["soleus.json"]},{"value":"delt_front","record":["delt_front.json"]},{"value":"delt_side","record":["delt_side.json"]},{"value":"delt_rear","record":["delt_rear.json"]},{"value":"forearm_flexors","record":["forearm_flexors.json"]},{"value":"forearm_extensors","record":["forearm_extensors.json"]},{"value":"glute_max","record":["glute_max.json"]},{"value":"glute_medius","record":["glute_medius.json"]},{"value":"chest_upper","record":["chest_upper.json"]},{"value":"chest_mid_lower","record":["chest_mid_lower.json"]},{"value":"traps_upper","record":["traps_upper.json"]},{"value":"traps_mid_lower","record":["traps_mid_lower.json"]},{"value":"triceps_long","record":["triceps_long.json"]},{"value":"triceps_lateral_medial","record":["triceps_lateral_medial.json"]},{"value":"rotator_cuff","record":["rotator_cuff.json"]},{"value":"rhomboids","record":["rhomboids.json"]},{"value":"brachialis","record":["brachialis.json"]},{"value":"hip_flexors","record":["hip_flexors.json"]},{"value":"adductors","record":["adductors.json"]}]
+[
+  {
+    "value": 1,
+    "record": ["abdominal.json"]
+  },
+  {
+    "value": 2,
+    "record": ["biceps.json"]
+  },
+  {
+    "value": 3,
+    "record": ["calves.json"]
+  },
+  {
+    "value": 4,
+    "record": ["deltoids.json"]
+  },
+  {
+    "value": 5,
+    "record": ["erector_spinae.json"]
+  },
+  {
+    "value": 6,
+    "record": ["forearms.json"]
+  },
+  {
+    "value": 7,
+    "record": ["gluteus_maximus.json"]
+  },
+  {
+    "value": 8,
+    "record": ["hamstrings.json"]
+  },
+  {
+    "value": 9,
+    "record": ["latissimus_dorsi.json"]
+  },
+  {
+    "value": 10,
+    "record": ["obliques.json"]
+  },
+  {
+    "value": 11,
+    "record": ["pectorals.json"]
+  },
+  {
+    "value": 12,
+    "record": ["quadriceps.json"]
+  },
+  {
+    "value": 13,
+    "record": ["trapezius.json"]
+  },
+  {
+    "value": 14,
+    "record": ["triceps.json"]
+  }
+]
