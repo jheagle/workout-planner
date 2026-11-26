@@ -7,6 +7,16 @@ describe('musclePriority', () => {
   // Built from local parts: only the local date of "today" counts, so this holds in any timezone
   const today = new Date(2024, 5, 10, 12, 0)
 
+  test('a muscle split into regions is ranked by its regions, named after the muscle', () => {
+    const muscles = [muscle('11', 'Pectorals'), { ...muscle('chest_upper', 'Upper chest'), parent_id: '11' }, muscle('2', 'Biceps')]
+    const workouts = [workout('2024-06-09', [muscles[1]])]
+    const result = musclePriority(muscles, workouts, today)
+    expect(result.map(row => [row.muscleId, row.name, row.daysSinceLastWorked])).toEqual([
+      ['2', 'Biceps', Infinity],
+      ['chest_upper', 'Pectorals: Upper chest', 1]
+    ])
+  })
+
   test('a muscle with no workout history at all needs priority, with no days-since value', () => {
     const [result] = musclePriority([muscle(1, 'Chest')], [], today)
     expect(result.daysSinceLastWorked).toBe(Infinity)

@@ -118,6 +118,12 @@ export const readReps = text => {
  */
 export const readGroup = text => {
   const value = text.trim()
+  // A remark in brackets before the numbers: "(other arm assist) 4"; read the rest, keep the text in the note
+  const aside = value.match(/^\(([^)]*)\)\s*(.+)$/)
+  if (aside) return { rows: readGroup(aside[2]).rows, exact: false }
+  // Bars crossed, out and back: "9 bars x 2" is one set of 18 bars
+  const bars = value.match(/^(\d+)\s*bars?\s*x\s*(\d+)$/i)
+  if (bars) return { rows: [{ weightEffort: null, sets: 1, reps: Number(bars[1]) * Number(bars[2]) }], exact: false }
   // A timed hold, possibly with sets: "02:00:00", "2x 30 seconds", "5x0:30"
   const timed = value.match(/^(?:(\d+)\s*x\s*)?(.+)$/i)
   const duration = timed && readDuration(timed[2])
@@ -130,7 +136,13 @@ export const readGroup = text => {
   if (weighted && (weighted[2] || bareWeight)) {
     const weightEffort = `${weighted[1].replace(/\s+/g, '')}lbs`
     const rest = weighted[3].trim()
-    if (!rest) return { rows: [{ weightEffort, sets: null, reps: null }], exact: false }
+    // A weight with no reps ("160lbs,") is a set that was never finished or never saved: nothing to keep
+    if (!rest) return { rows: [], exact: false }
+    // The same weight typed twice: "20lbs, 20lbs, 10" is one set of 10 at 20 lbs
+    const repeated = rest.match(/^((?:\d+\s*x\s*)?\d+(?:\.\d+)?)\s*lbs?\s*,\s*(.+)$/i)
+    if (repeated && repeated[1].replace(/\s+/g, '') === weighted[1].replace(/\s+/g, '')) {
+      return { rows: readGroup(`${weighted[1]}lbs, ${repeated[2]}`).rows, exact: false }
+    }
     const groups = readReps(rest)
     // Exact only with a real unit: a bare number or the "lba" typo is kept in the note too, for review
     if (groups) return { rows: groups.map(group => ({ weightEffort, ...group })), exact: /^lbs?$/i.test(weighted[2] || '') }
@@ -166,9 +178,12 @@ export const readCell = text => {
  * A sheet's CSV as workouts.
  * @param {string} text
  * @param {string} area The sheet's body area, e.g. 'upper'.
+ * @param {Array<{area: string, exercise: string, text: string, date: (string|undefined), moveTo: (string|undefined), moveArea: (string|undefined)}>} [fixes=[]]
+ * Single cells corrected by hand, found by sheet, exercise and cell text: `date` dates a cell in a column with no
+ * date; `moveTo` logs the cell under another exercise (in `moveArea`, default this sheet's).
  * @returns {{exercises: Array<{name: string, area: string, original: string}>, workouts: Array<Object>, problems: string[]}}
  */
-export const parseSheet = (text, area) => {
+export const parseSheet = (text, area, fixes = []) => {
   const [header = [], ...rows] = parseCsv(text)
   const problems = []
   const dates = header.map((cell, column) => {
@@ -207,15 +222,23 @@ export const parseSheet = (text, area) => {
     row.slice(1).forEach((cell, index) => {
       const text = cell.trim()
       if (!text) return
-      const date = dates[index + 1]
+      const fix = fixes.find(each => each.area === area && nameKey(each.exercise) === nameKey(name) && each.text === text)
+      const date = dates[index + 1] || fix?.date
       if (!date) {
         problems.push(`${area}: "${name}" has "${text}" under column ${index + 2}, which has no date; skipped`)
         return
       }
+      if (!dates[index + 1]) problems.push(`${area}: "${name}" has "${text}" under column ${index + 2}, which has no date; dated ${date} by hand`)
+      const exercise = fix?.moveTo ? cleanName(fix.moveTo) : name
+      const exerciseArea = fix?.moveTo ? fix.moveArea || area : area
+      if (fix?.moveTo) {
+        problems.push(`${area}: ${date} ${name}: "${text}" logged under ${exercise} by hand`)
+        if (!exercises.some(each => each.name === exercise)) exercises.push({ name: exercise, area: exerciseArea, original: exercise })
+      }
       const { rows: read, exact } = readCell(text)
-      if (!exact) problems.push(`${area}: ${date} ${name}: "${text}" read as ${read.length ? read.map(each => `${each.weightEffort || 'bodyweight'} ${each.sets ?? '?'}x${each.reps ?? '?'}`).join(', ') : 'nothing'}; the cell's text is kept in the note`)
-      read.forEach(each => workouts.push({ date, exercise: name, area, row: rowIndex, ...each, note: exact ? null : text }))
-      if (!read.length) workouts.push({ date, exercise: name, area, row: rowIndex, weightEffort: null, sets: null, reps: null, note: text })
+      if (!exact) problems.push(`${area}: ${date} ${exercise}: "${text}" read as ${read.length ? `${read.map(each => `${each.weightEffort || 'bodyweight'} ${each.sets ?? '?'}x${each.reps ?? '?'}`).join(', ')}; the cell's text is kept in the note` : 'nothing; skipped'}`)
+      // A cell with nothing readable (only unfinished sets like "315lbs,") adds no workout
+      read.forEach(each => workouts.push({ date, exercise, area: exerciseArea, row: rowIndex, ...each, note: exact ? null : text }))
     })
   })
   return { exercises, workouts, problems }

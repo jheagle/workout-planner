@@ -2025,7 +2025,10 @@ var workoutPlanner = (() => {
       };
       var musclePriority = (muscles = [], workoutsWithMuscles = [], today = /* @__PURE__ */ new Date()) => {
         const stats = {};
+        const parentIds = new Set(muscles.filter((muscle) => muscle.parent_id).map((muscle) => String(muscle.parent_id)));
+        const byId = new Map(muscles.map((muscle) => [String(muscle._id), muscle]));
         muscles.forEach((muscle) => {
+          if (parentIds.has(String(muscle._id))) return;
           stats[muscle._id] = {
             muscle,
             lastWorkedDate: null,
@@ -2060,9 +2063,10 @@ var workoutPlanner = (() => {
         }) => {
           const daysSinceLastWorked = lastWorkedDate !== null ? todayNumber - lastWorkedDate : Infinity;
           const timesWorkedThisWeek = datesThisWeek.size;
+          const parent = muscle.parent_id ? byId.get(String(muscle.parent_id)) : null;
           return {
             muscleId: muscle._id,
-            name: muscle.name,
+            name: parent ? `${parent.name}: ${muscle.name}` : muscle.name,
             daysSinceLastWorked,
             timesWorkedThisWeek,
             needsPriority: daysSinceLastWorked >= RECOVERY_DAYS || timesWorkedThisWeek < TARGET_TIMES_PER_WEEK

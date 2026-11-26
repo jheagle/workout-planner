@@ -1,13 +1,16 @@
 /**
  * Import the workout history from Joshua's Google Sheets (CSV exports) into database/.
  *
- *   node scripts/import-sheets.js upper=path/upper.csv lower=path/lower.csv core=path/core.csv [--database database/] [--dry-run]
+ *   node scripts/import-sheets.js upper=path/upper.csv lower=path/lower.csv core=path/core.csv [--database database/] [--replace] [--dry-run]
  *
  * Each sheet's name before `=` is its body area (a category: upper, lower, core). For every exercise row it finds or
  * creates the exercise (matched by name, ignoring case and spacing; two existing exercises are matched to their sheet
  * names, see `renames`), links its category and its guessed equipment, then adds every session as workouts rows.
  * A row identical to one already stored (same date, exercise, effort, sets and reps, counted per copy) is skipped, so
- * running it again changes nothing. Muscles aren't linked: Joshua adds those himself.
+ * running it again changes nothing. Muscles aren't linked here: scripts/apply-muscle-map.js does that.
+ *
+ * --replace first deletes every workout dated on or after the sheets' earliest date, so the sheets are imported
+ * fresh: use it after a change to how cells are read. Workouts before that date (the 2024 seed) are kept.
  *
  * It prints a report: what was added, every cell it couldn't fully read (their text is kept in the workout's note),
  * and the equipment it guessed, for review.
@@ -19,6 +22,20 @@ import { parseSheet, nameKey, guessEquipment } from '../assets/js/data/sheetImpo
 /** Existing exercises whose stored names differ from the sheets' (stored name -> sheet name). */
 const renames = { 'bench press': 'Barbell bench press', squat: 'Barbell Squat' }
 
+/**
+ * Sheet names that are another exercise (sheet name -> stored name), decided with Joshua (WP-1, 2026-11-26). Their
+ * workouts go to that exercise, and an exercise already stored under the sheet name is merged into it.
+ */
+const aliases = { 'incline bench press': 'Barbell Incline Press' }
+
+/** Single cells corrected by hand (WP-1, 2026-11-26); see parseSheet. */
+const cellFixes = [
+  // In a core column with no date, between 2025-08-04 and 2025-07-23: the dumbbell and bodyweight day, no machines
+  { area: 'core', exercise: 'Hand-to-Foot ball pass', text: '3x10', date: '2025-07-31' },
+  // Chin-ups done holding an L, logged under the hold
+  { area: 'core', exercise: 'Hanging L Sit', text: '3x10 chin-ups', moveTo: 'L-sit Chin-ups', moveArea: 'upper' }
+]
+
 const slug = text => text.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
 
 const args = process.argv.slice(2)
@@ -27,6 +44,7 @@ const option = name => {
   return index === -1 ? null : args[index + 1]
 }
 const dryRun = args.includes('--dry-run')
+const replace = args.includes('--replace')
 const databasePath = option('--database') || 'database/'
 const sheets = args.filter(arg => arg.includes('=')).map(arg => {
   const [area, file] = arg.split('=')
@@ -39,9 +57,12 @@ if (!sheets.length) {
 
 const parsed = { exercises: [], workouts: [], problems: [] }
 for (const { area, file } of sheets) {
-  const result = parseSheet(fs.readFileSync(file, 'utf8'), area)
+  const result = parseSheet(fs.readFileSync(file, 'utf8'), area, cellFixes)
   for (const key of Object.keys(parsed)) parsed[key].push(...result[key])
 }
+const aliased = name => aliases[nameKey(name)] ?? name
+parsed.exercises.forEach(exercise => { exercise.name = aliased(exercise.name) })
+parsed.workouts.forEach(workout => { workout.exercise = aliased(workout.exercise) })
 
 configure({ databasePath })
 const run = async () => {
@@ -65,6 +86,29 @@ const run = async () => {
     byKey.delete(storedKey)
     byKey.set(nameKey(sheetName), { ...exercise, name: sheetName })
   }
+  // Merge an exercise stored under an alias into the exercise it is: its workouts move, its links go
+  report.exercisesMerged = []
+  for (const [aliasKey, targetName] of Object.entries(aliases)) {
+    const alias = byKey.get(aliasKey)
+    const target = byKey.get(nameKey(targetName))
+    if (!alias || !target) continue
+    const aliasId = quote(String(alias._id))
+    if (!dryRun) {
+      await query(`update workouts set exercise_id = ${quote(String(target._id))} where exercise_id = ${aliasId}`)
+      for (const link of ['exercise_category', 'exercise_equipment', 'exercise_muscle']) await query(`delete ${link} where exercise_id = ${aliasId}`)
+      await query(`delete exercises where _id = ${aliasId}`)
+    }
+    report.exercisesMerged.push(`${alias.name} -> ${target.name}`)
+    byKey.delete(aliasKey)
+  }
+
+  if (replace) {
+    const earliest = parsed.workouts.map(workout => workout.date).sort()[0]
+    const [old] = await query(`read workouts where date >= ${quote(earliest)}`)
+    if (!dryRun) await query(`delete workouts where date >= ${quote(earliest)}`)
+    report.workoutsReplaced = old.length
+  }
+
   const seen = new Set()
   for (const { name, area, original } of parsed.exercises) {
     const key = nameKey(name)
@@ -98,8 +142,11 @@ const run = async () => {
     }
   }
 
-  // Workouts: one row per set group, ordered within a day by sheet (upper, lower, core) then row
-  const [existing] = await query('read workouts')
+  // Workouts: one row per set group, ordered within a day by sheet (upper, lower, core) then row. A dry run with
+  // --replace counts as if the replaced rows were gone
+  const [readExisting] = await query('read workouts')
+  const earliest = parsed.workouts.map(workout => workout.date).sort()[0]
+  const existing = replace ? readExisting.filter(workout => workout.date < earliest) : readExisting
   const identity = workout => [workout.date, String(workout.exercise_id), workout.weight_effort || '', workout.sets ?? '', workout.reps ?? ''].join('|')
   // How many of each identical row are already stored: the sheet can hold the same set twice in a session
   // ("50lbs, 10; 50lbs, 10"), so a row is skipped only while the database still has an unmatched copy of it
@@ -135,6 +182,8 @@ const run = async () => {
   }
 
   console.log(`${dryRun ? 'Dry run: would add' : 'Added'} ${report.exercisesAdded.length} exercises and ${report.workoutsAdded} workouts (${report.workoutsSkipped} already stored, skipped).`)
+  if (report.workoutsReplaced !== undefined) console.log(`${dryRun ? 'Would replace' : 'Replaced'} ${report.workoutsReplaced} workouts dated ${earliest} or later.`)
+  if (report.exercisesMerged.length) console.log(`\nMerged:\n  ${report.exercisesMerged.join('\n  ')}`)
   if (report.exercisesRenamed.length) console.log(`\nRenamed to match the sheets:\n  ${report.exercisesRenamed.join('\n  ')}`)
   if (report.exercisesAdded.some(name => name.includes('(sheet:'))) console.log(`\nNames cleaned up:\n  ${report.exercisesAdded.filter(name => name.includes('(sheet:')).join('\n  ')}`)
   console.log(`\nCells to check (${parsed.problems.length}):\n  ${parsed.problems.join('\n  ')}`)

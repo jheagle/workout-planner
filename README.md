@@ -3,6 +3,16 @@
 [![tests](https://github.com/jheagle/workout-planner/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/jheagle/workout-planner/actions/workflows/tests.yml)
 
 Plan daily and weekly workouts based on goals and muscle groups.
+
+## Data
+
+The workout history lives in `database/` (json-fs-query records). Two scripts fill it:
+
+- `node scripts/import-sheets.js upper=<csv> lower=<csv> core=<csv> [--replace] [--dry-run]` imports the history from
+  the Google Sheets CSV exports. `--replace` re-imports the sheets' date range from scratch.
+- `node scripts/apply-muscle-map.js` writes the muscle map (`assets/js/data/muscleMap.js`) into `database/`: the
+  muscles, their regions, and each exercise's share of the work per muscle.
+
 ## Modules
 
 <dl>
@@ -17,6 +27,20 @@ and each cell what was done that day, as <code>;</code>-separated groups of <cod
   02:00:00 / 2x 30 seconds / 5x0:30   timed holds (Sheets turns 2:00 into 02:00:00)</p>
 <p>Anything else is read as far as it can be, and the cell&#39;s own text is kept in the workout&#39;s note so nothing is lost.
 This module only parses; scripts/import-sheets.js writes to the database.</p>
+</dd>
+<dt><a href="#module_muscleMap">muscleMap</a></dt>
+<dd><p>The muscle map: every muscle (some split into regions that training can target separately) and how much of each
+exercise&#39;s work each muscle does. Worked out with Joshua on 2026-11-26 (WP-1; the discussion and the reasons are in
+tm&#39;s WP/muscle-map).</p>
+<p>Rules:</p>
+<ul>
+<li>An exercise links to a region where its muscle has them (Chest: upper, mid/lower), otherwise to the muscle.</li>
+<li>A rank is the muscle&#39;s share of the work, 0-100: 100 the target, 60-80 strong, 30-50 minor. Estimates, to be
+fine-tuned.</li>
+<li>No stabilizers, except the core on lifts that need heavy bracing (squats including hack and Smith, deadlifts,
+RDLs, standing presses): abs, obliques and erector spinae get about 20.</li>
+<li>An exercise is mapped for its usual form (cable cross: high to low).</li>
+</ul>
 </dd>
 </dl>
 
@@ -238,10 +262,11 @@ A sheet's CSV as workouts.
 
 **Kind**: static constant of [<code>sheetImport</code>](#module_sheetImport)  
 
-| Param | Type | Description |
-| --- | --- | --- |
-| text | <code>string</code> |  |
-| area | <code>string</code> | The sheet's body area, e.g. 'upper'. |
+| Param | Type | Default | Description |
+| --- | --- | --- | --- |
+| text | <code>string</code> |  |  |
+| area | <code>string</code> |  | The sheet's body area, e.g. 'upper'. |
+| [fixes] | <code>Array.&lt;{area: string, exercise: string, text: string, date: (string\|undefined), moveTo: (string\|undefined), moveArea: (string\|undefined)}&gt;</code> | <code>[]</code> | Single cells corrected by hand, found by sheet, exercise and cell text: `date` dates a cell in a column with no date; `moveTo` logs the cell under another exercise (in `moveArea`, default this sheet's). |
 
 <a name="module_sheetImport.guessEquipment"></a>
 
@@ -267,6 +292,90 @@ Known misspellings in the sheets, fixed on import (the original text goes in the
 Equipment guessed from an exercise's name, checked in order; a name can match several.
 
 **Kind**: inner constant of [<code>sheetImport</code>](#module_sheetImport)  
+<a name="module_muscleMap"></a>
+
+## muscleMap
+The muscle map: every muscle (some split into regions that training can target separately) and how much of each
+exercise's work each muscle does. Worked out with Joshua on 2026-11-26 (WP-1; the discussion and the reasons are in
+tm's WP/muscle-map).
+
+Rules:
+- An exercise links to a region where its muscle has them (Chest: upper, mid/lower), otherwise to the muscle.
+- A rank is the muscle's share of the work, 0-100: 100 the target, 60-80 strong, 30-50 minor. Estimates, to be
+  fine-tuned.
+- No stabilizers, except the core on lifts that need heavy bracing (squats including hack and Smith, deadlifts,
+  RDLs, standing presses): abs, obliques and erector spinae get about 20.
+- An exercise is mapped for its usual form (cable cross: high to low).
+
+
+* [muscleMap](#module_muscleMap)
+    * _static_
+        * [.muscles](#module_muscleMap.muscles) : <code>Array.&lt;{\_id: string, name: string, alias: string, parent\_id: (string\|undefined)}&gt;</code>
+        * [.exerciseShares](#module_muscleMap.exerciseShares) : <code>Object.&lt;string, Object.&lt;string, number&gt;&gt;</code>
+        * [.exerciseDescriptions](#module_muscleMap.exerciseDescriptions)
+        * [.applyMuscleMap](#module_muscleMap.applyMuscleMap) ⇒ <code>Promise.&lt;{musclesAdded: Array.&lt;string&gt;, musclesUpdated: Array.&lt;string&gt;, exercisesLinked: number, links: number, unmapped: Array.&lt;string&gt;, missing: Array.&lt;string&gt;}&gt;</code>
+    * _inner_
+        * [~U](#module_muscleMap..U)
+        * [~CORE](#module_muscleMap..CORE)
+        * [~pressTriceps(share)](#module_muscleMap..pressTriceps) ⇒ <code>Object.&lt;string, number&gt;</code>
+
+<a name="module_muscleMap.muscles"></a>
+
+### muscleMap.muscles : <code>Array.&lt;{\_id: string, name: string, alias: string, parent\_id: (string\|undefined)}&gt;</code>
+Every muscle. The first 14 keep the ids the app started with; a muscle with regions is a parent, and its regions
+name it in `parent_id`.
+
+**Kind**: static constant of [<code>muscleMap</code>](#module_muscleMap)  
+<a name="module_muscleMap.exerciseShares"></a>
+
+### muscleMap.exerciseShares : <code>Object.&lt;string, Object.&lt;string, number&gt;&gt;</code>
+Each exercise's muscles, by exercise name (matched without case or spacing) to muscle or region id and share.
+
+**Kind**: static constant of [<code>muscleMap</code>](#module_muscleMap)  
+<a name="module_muscleMap.exerciseDescriptions"></a>
+
+### muscleMap.exerciseDescriptions
+Descriptions written for users, by exercise name.
+
+**Kind**: static constant of [<code>muscleMap</code>](#module_muscleMap)  
+<a name="module_muscleMap.applyMuscleMap"></a>
+
+### muscleMap.applyMuscleMap ⇒ <code>Promise.&lt;{musclesAdded: Array.&lt;string&gt;, musclesUpdated: Array.&lt;string&gt;, exercisesLinked: number, links: number, unmapped: Array.&lt;string&gt;, missing: Array.&lt;string&gt;}&gt;</code>
+Write the muscle map into a database: the muscles (adding `parent_id` to the record if it's missing), each mapped
+exercise's links (replacing the ones it had), and the descriptions. Running it again changes nothing.
+
+**Kind**: static constant of [<code>muscleMap</code>](#module_muscleMap)  
+**Returns**: <code>Promise.&lt;{musclesAdded: Array.&lt;string&gt;, musclesUpdated: Array.&lt;string&gt;, exercisesLinked: number, links: number, unmapped: Array.&lt;string&gt;, missing: Array.&lt;string&gt;}&gt;</code> - unmapped: stored exercises with no entry in the map; missing: map entries with no stored exercise.  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| query | <code>function</code> | json-fs-query's query, configured for the database. |
+| quote | <code>function</code> | json-fs-query's quote. |
+
+<a name="module_muscleMap..U"></a>
+
+### muscleMap~U
+Short names used in the shares below.
+
+**Kind**: inner constant of [<code>muscleMap</code>](#module_muscleMap)  
+<a name="module_muscleMap..CORE"></a>
+
+### muscleMap~CORE
+The core share on lifts that need heavy bracing (erector spinae keeps a bigger share where it has one).
+
+**Kind**: inner constant of [<code>muscleMap</code>](#module_muscleMap)  
+<a name="module_muscleMap..pressTriceps"></a>
+
+### muscleMap~pressTriceps(share) ⇒ <code>Object.&lt;string, number&gt;</code>
+Triceps in a press, push-up or dip: the share goes to the lateral and medial heads, and the long head gets about 60%
+of it (to the nearest 10).
+
+**Kind**: inner method of [<code>muscleMap</code>](#module_muscleMap)  
+
+| Param | Type |
+| --- | --- |
+| share | <code>number</code> | 
+
 <a name="logWorkout"></a>
 
 ## logWorkout
@@ -425,7 +534,7 @@ this week yet - whichever muscle has gone longest without being worked sorts fir
 | --- | --- |
 | muscles | every row from `read muscles` |
 | workoutsWithMuscles | every row from the workouts-joined-to-muscles query, each carrying a `.muscles` array (the muscles that workout's exercise worked) |
-| today | injectable for testing; defaults to the real current time (only its local date counts). Workouts dated after it are ignored |
+| today | injectable for testing; defaults to the real current time (only its local date counts). Workouts dated after it are ignored A muscle split into regions (Pectorals: upper chest, mid and lower chest) is ranked by its regions, since exercises link to those: the muscle itself isn't listed, and each region's name starts with the muscle's. |
 
 <a name="localDate"></a>
 
