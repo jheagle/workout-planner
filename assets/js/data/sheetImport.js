@@ -87,8 +87,10 @@ export const readDuration = text => {
   if (secondsOnly) return `${Number(secondsOnly[1])} seconds`
   const clock = value.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/)
   if (!clock) return null
-  // Sheets turns "2:00" into "02:00:00" (hh:mm:ss); a hold is minutes:seconds, so hh:mm:00 reads as mm:ss
-  const [minutes, seconds] = clock[3] === '00' || clock[3] === undefined ? [clock[1], clock[2]] : [String(Number(clock[1]) * 60 + Number(clock[2])), clock[3]]
+  // Sheets turns "2:00" into "02:00:00" (hh:mm:ss), so a hold (never an hour long) with hours and no seconds reads as
+  // mm:ss. With hours at 00 it's a real time: "00:02:00" is 2 minutes
+  const sheetsShifted = clock[3] !== undefined && clock[1] !== '00' && clock[3] === '00'
+  const [minutes, seconds] = clock[3] === undefined || sheetsShifted ? [clock[1], clock[2]] : [String(Number(clock[1]) * 60 + Number(clock[2])), clock[3]]
   return `${Number(minutes)}:${seconds}`
 }
 

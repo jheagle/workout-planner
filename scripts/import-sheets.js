@@ -18,6 +18,7 @@
 import fs from 'fs'
 import { configure, packDatabase, query, quote } from 'json-fs-query'
 import { parseSheet, nameKey, guessEquipment } from '../assets/js/data/sheetImport.js'
+import { readWeightText } from '../assets/js/data/units.js'
 
 /** Existing exercises whose stored names differ from the sheets' (stored name -> sheet name). */
 const renames = { 'bench press': 'Barbell bench press', squat: 'Barbell Squat' }
@@ -35,6 +36,17 @@ const cellFixes = [
   // Chin-ups done holding an L, logged under the hold
   { area: 'core', exercise: 'Hanging L Sit', text: '3x10 chin-ups', moveTo: 'L-sit Chin-ups', moveArea: 'upper' }
 ]
+
+/**
+ * A sheet cell's weight or time as workout fields: weight (decimal text) and unit, or seconds; none when neither.
+ * @param {string|null} text - '180lbs', '2x40lbs', '0:30'
+ * @returns {{weight: (string|undefined), unit: (string|undefined), seconds: (number|undefined)}}
+ */
+const weightFields = text => {
+  const { weight, seconds } = readWeightText(text || '')
+  if (weight) return { weight: String(weight.amount), unit: weight.unit }
+  return seconds !== null ? { seconds } : {}
+}
 
 const slug = text => text.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
 
@@ -147,7 +159,7 @@ const run = async () => {
   const [readExisting] = await query('read workouts')
   const earliest = parsed.workouts.map(workout => workout.date).sort()[0]
   const existing = replace ? readExisting.filter(workout => workout.date < earliest) : readExisting
-  const identity = workout => [workout.date, String(workout.exercise_id), workout.weight_effort || '', workout.sets ?? '', workout.reps ?? ''].join('|')
+  const identity = workout => [workout.date, String(workout.exercise_id), workout.weight ?? '', workout.unit ?? '', workout.seconds ?? '', workout.sets ?? '', workout.reps ?? ''].join('|')
   // How many of each identical row are already stored: the sheet can hold the same set twice in a session
   // ("50lbs, 10; 50lbs, 10"), so a row is skipped only while the database still has an unmatched copy of it
   const stored = new Map()
@@ -159,7 +171,8 @@ const run = async () => {
     const row = {
       date: workout.date,
       exercise_id: String(byKey.get(nameKey(workout.exercise))._id),
-      weight_effort: workout.weightEffort,
+      // The sheets are in lbs; a hold's time becomes seconds
+      ...weightFields(workout.weightEffort),
       sets: workout.sets,
       reps: workout.reps
     }
@@ -174,7 +187,8 @@ const run = async () => {
     if (dryRun) continue
     // Optional fields are left out when there's nothing to store (the schema allows leaving them out, not null)
     const values = [`exercise_id = ${quote(row.exercise_id)}`, `order = ${position}`, `date = ${quote(row.date)}`]
-    if (row.weight_effort) values.push(`weight_effort = ${quote(row.weight_effort)}`)
+    if (row.weight !== undefined) values.push(`weight = ${quote(row.weight)}`, `unit = ${quote(row.unit)}`)
+    if (row.seconds !== undefined) values.push(`seconds = ${row.seconds}`)
     if (row.sets !== null && row.sets !== undefined) values.push(`sets = ${row.sets}`)
     if (row.reps !== null && row.reps !== undefined) values.push(`reps = ${row.reps}`)
     if (workout.note) values.push(`note = ${quote(workout.note)}`)

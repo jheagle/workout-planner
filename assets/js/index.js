@@ -4,10 +4,11 @@ import { lastSessionDisplay, formatLastSession } from './components/templates/la
 import { logWorkoutForm, wireLogWorkoutFormEvents } from './components/templates/logWorkoutForm.js'
 import { addExerciseForm, wireAddExerciseFormEvents } from './components/templates/addExerciseForm.js'
 import { getMusclePriority, getExercisesForMuscle, getLastSession } from './data/browserReads.js'
+import { WEIGHT_UNITS, defaultUnit, formatSeconds, workoutWeight } from './data/units.js'
 
 /* global treeloom, treeloomComponents -- both loaded as plain scripts in muscles.html before this native ES module runs, not npm imports */
 window.treeloom = treeloom
-const { option, text, main, header, heading } = treeloomComponents
+const { option, select, text, main, header, heading } = treeloomComponents
 
 // Reads run here, on json-fs-query's browser build: it reads database/ from this page's own origin (see
 // data/browserReads.js), so the page works with no server running. Writes need real filesystem access, which a page
@@ -19,9 +20,34 @@ let lastSessionItem
 let logForm
 let addForm
 let lastSessionId = null
+let lastSession = null
+let unitPicker
 
+// Weights show in the viewer's unit, remembered in this browser (a convenience: without storage it starts from the
+// browser's language each time)
+const UNIT_KEY = 'workoutPlanner.unit'
+const readPreferredUnit = () => {
+  try {
+    const stored = window.localStorage.getItem(UNIT_KEY)
+    if (WEIGHT_UNITS.includes(stored)) return stored
+  } catch (error) {}
+  return defaultUnit(navigator.language)
+}
+let preferredUnit = readPreferredUnit()
+const savePreferredUnit = (unit) => {
+  preferredUnit = unit
+  try {
+    window.localStorage.setItem(UNIT_KEY, unit)
+  } catch (error) {}
+}
+
+// The form starts from the last session as entered, in the unit that exercise's equipment uses (a machine's unit
+// doesn't change); with no last session, in the viewer's unit
 const fillFormFrom = (session) => {
-  logForm.weightEffortInput.element.value = session ? session.weight_effort || '' : ''
+  const weight = session ? workoutWeight(session) : null
+  logForm.weightInput.element.value = weight ? String(weight.amount) : ''
+  logForm.unitSelect.element.value = weight ? weight.unit : preferredUnit
+  logForm.secondsInput.element.value = session && session.seconds ? formatSeconds(session.seconds) : ''
   logForm.setsInput.element.value = session ? session.sets : ''
   logForm.repsInput.element.value = session ? session.reps : ''
   logForm.noteInput.element.value = session ? session.note || '' : ''
@@ -29,8 +55,13 @@ const fillFormFrom = (session) => {
 
 const updateLastSession = (session) => {
   lastSessionId = session ? session._id : null
+  lastSession = session
   fillFormFrom(session)
-  lastSessionItem.children = [text(formatLastSession(session))]
+  showLastSession()
+}
+
+const showLastSession = () => {
+  lastSessionItem.children = [text(formatLastSession(lastSession, preferredUnit))]
   treeloom.updateChildNodes(lastSessionItem)
 }
 
@@ -42,7 +73,7 @@ const onExerciseChange = (exerciseId) => {
   getLastSession(exerciseId).then(updateLastSession)
 }
 
-const onLogWorkout = ({ weightEffort, sets, reps, note, date }) => {
+const onLogWorkout = ({ weight, unit, seconds, sets, reps, note, date }) => {
   const exerciseId = picker.exerciseSelect.element.value
   if (!exerciseId) {
     return
@@ -52,7 +83,9 @@ const onLogWorkout = ({ weightEffort, sets, reps, note, date }) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       exerciseId,
-      weightEffort,
+      weight,
+      unit,
+      seconds,
       sets: sets || 0,
       reps: reps || 0,
       note,
@@ -63,7 +96,7 @@ const onLogWorkout = ({ weightEffort, sets, reps, note, date }) => {
     .then(() => onExerciseChange(exerciseId))
 }
 
-const onUpdateWorkout = ({ weightEffort, sets, reps, note }) => {
+const onUpdateWorkout = ({ weight, unit, seconds, sets, reps, note }) => {
   if (!lastSessionId) {
     return
   }
@@ -71,7 +104,7 @@ const onUpdateWorkout = ({ weightEffort, sets, reps, note }) => {
   fetch(`${API_BASE}/api/workouts/${lastSessionId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ weightEffort, sets: sets || 0, reps: reps || 0, note })
+    body: JSON.stringify({ weight, unit, seconds, sets: sets || 0, reps: reps || 0, note })
   })
     .then((response) => response.json())
     .then(() => onExerciseChange(exerciseId))
@@ -120,10 +153,11 @@ const onMuscleChange = (muscleId) => {
 }
 
 const renderPage = (priorityRows) => {
-  const mainHeader = header([heading(1, [text('Workout Planner')])])
+  unitPicker = select([option('kg', 'Weights in kg'), option('lbs', 'Weights in lbs')], 'unit-picker', { 'aria-label': 'Show weights in' })
+  const mainHeader = header([heading(1, [text('Workout Planner')]), unitPicker])
   const priorityTable = musclePriorityList(priorityRows)
   picker = exercisePicker(priorityRows)
-  lastSessionItem = lastSessionDisplay(null)
+  lastSessionItem = lastSessionDisplay(null, preferredUnit)
   logForm = logWorkoutForm()
   addForm = addExerciseForm(priorityRows)
   const documentItem = treeloom.documentItem
@@ -161,6 +195,11 @@ const renderPage = (priorityRows) => {
   wireExercisePickerEvents(picker, onMuscleChange, onExerciseChange)
   wireLogWorkoutFormEvents(logForm, onLogWorkout, onUpdateWorkout)
   wireAddExerciseFormEvents(addForm, onAddExercise)
+  unitPicker.element.value = preferredUnit
+  treeloom.fullAddEventListener('change', () => {
+    savePreferredUnit(unitPicker.element.value)
+    showLastSession()
+  }, 'onUnitChange', null, null, unitPicker)
 
   if (priorityRows.length) {
     onMuscleChange(String(priorityRows[0].muscleId))

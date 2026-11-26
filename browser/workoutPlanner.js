@@ -272,8 +272,8 @@ var workoutPlanner = (() => {
       "use strict";
       init_process();
       var globalThis2 = require_global_this();
-      var navigator = globalThis2.navigator;
-      var userAgent = navigator && navigator.userAgent;
+      var navigator2 = globalThis2.navigator;
+      var userAgent = navigator2 && navigator2.userAgent;
       module.exports = userAgent ? String(userAgent) : "";
     }
   });
@@ -1258,18 +1258,6 @@ var workoutPlanner = (() => {
     }
   });
 
-  // node_modules/core-js/internals/is-array.js
-  var require_is_array = __commonJS({
-    "node_modules/core-js/internals/is-array.js"(exports, module) {
-      "use strict";
-      init_process();
-      var classof = require_classof_raw();
-      module.exports = Array.isArray || function isArray(argument) {
-        return classof(argument) === "Array";
-      };
-    }
-  });
-
   // node_modules/core-js/internals/object-keys.js
   var require_object_keys = __commonJS({
     "node_modules/core-js/internals/object-keys.js"(exports, module) {
@@ -1380,6 +1368,64 @@ var workoutPlanner = (() => {
           result[IE_PROTO] = O;
         } else result = NullProtoObject();
         return Properties === void 0 ? result : definePropertiesModule.f(result, Properties);
+      };
+    }
+  });
+
+  // node_modules/core-js/internals/add-to-unscopables.js
+  var require_add_to_unscopables = __commonJS({
+    "node_modules/core-js/internals/add-to-unscopables.js"(exports, module) {
+      "use strict";
+      init_process();
+      var wellKnownSymbol = require_well_known_symbol();
+      var create = require_object_create();
+      var defineProperty = require_object_define_property().f;
+      var UNSCOPABLES = wellKnownSymbol("unscopables");
+      var ArrayPrototype = Array.prototype;
+      if (ArrayPrototype[UNSCOPABLES] === void 0) {
+        defineProperty(ArrayPrototype, UNSCOPABLES, {
+          configurable: true,
+          value: create(null)
+        });
+      }
+      module.exports = function(key) {
+        ArrayPrototype[UNSCOPABLES][key] = true;
+      };
+    }
+  });
+
+  // node_modules/core-js/modules/es.array.includes.js
+  var require_es_array_includes = __commonJS({
+    "node_modules/core-js/modules/es.array.includes.js"() {
+      "use strict";
+      init_process();
+      var $ = require_export();
+      var $includes = require_array_includes().includes;
+      var fails = require_fails();
+      var addToUnscopables = require_add_to_unscopables();
+      var BROKEN_ON_SPARSE = fails(function() {
+        return !Array(1).includes();
+      });
+      var BROKEN_ON_SPARSE_WITH_FROM_INDEX = fails(function() {
+        return [, 1].includes(void 0, 1);
+      });
+      $({ target: "Array", proto: true, forced: BROKEN_ON_SPARSE || BROKEN_ON_SPARSE_WITH_FROM_INDEX }, {
+        includes: function includes(el) {
+          return $includes(this, el, arguments.length > 1 ? arguments[1] : void 0);
+        }
+      });
+      addToUnscopables("includes");
+    }
+  });
+
+  // node_modules/core-js/internals/is-array.js
+  var require_is_array = __commonJS({
+    "node_modules/core-js/internals/is-array.js"(exports, module) {
+      "use strict";
+      init_process();
+      var classof = require_classof_raw();
+      module.exports = Array.isArray || function isArray(argument) {
+        return classof(argument) === "Array";
       };
     }
   });
@@ -1829,12 +1875,12 @@ var workoutPlanner = (() => {
       exports.wireExercisePickerEvents = exports.exercisePicker = void 0;
       var {
         div,
-        select,
+        select: select2,
         option: option2
       } = treeloomComponents;
       var exercisePicker = (priorityRows = []) => {
-        const muscleSelect = select(priorityRows.map((row) => option2(String(row.muscleId), row.name)));
-        const exerciseSelect = select([option2("", "Pick a muscle first")], "", {
+        const muscleSelect = select2(priorityRows.map((row) => option2(String(row.muscleId), row.name)));
+        const exerciseSelect = select2([option2("", "Pick a muscle first")], "", {
           disabled: true
         });
         return {
@@ -1854,6 +1900,83 @@ var workoutPlanner = (() => {
     }
   });
 
+  // js-build-tools-cjs:dist/data/units.js
+  var require_units = __commonJS({
+    "js-build-tools-cjs:dist/data/units.js"(exports) {
+      "use strict";
+      init_process();
+      Object.defineProperty(exports, "__esModule", {
+        value: true
+      });
+      exports.workoutWeight = exports.showWeight = exports.readWeightText = exports.formatSeconds = exports.formatAmount = exports.defaultUnit = exports.convertWeight = exports.WEIGHT_UNITS = exports.KG_PER_LB = void 0;
+      var KG_PER_LB = exports.KG_PER_LB = 0.45359237;
+      var WEIGHT_UNITS = exports.WEIGHT_UNITS = ["kg", "lbs"];
+      var convertWeight = (amount, from, to) => {
+        if (from === to) return amount;
+        return from === "lbs" ? amount * KG_PER_LB : amount / KG_PER_LB;
+      };
+      exports.convertWeight = convertWeight;
+      var formatAmount = (amount) => String(Math.round(amount * 10) / 10);
+      exports.formatAmount = formatAmount;
+      var workoutWeight = (workout) => {
+        if (workout.weight !== void 0 && workout.weight !== null && workout.weight !== "") {
+          return {
+            amount: Number(workout.weight),
+            unit: workout.unit || "lbs"
+          };
+        }
+        return readWeightText(workout.weight_effort || "").weight;
+      };
+      exports.workoutWeight = workoutWeight;
+      var readWeightText = (text2) => {
+        const value = text2.trim();
+        const weight = value.match(/^(?:(\d+)\s*x\s*)?(\d+(?:\.\d+)?)\s*(lbs?|kgs?)$/i);
+        if (weight) {
+          const unit = /^kg/i.test(weight[3]) ? "kg" : "lbs";
+          return {
+            weight: {
+              amount: Number(weight[2]) * Number(weight[1] || 1),
+              unit
+            },
+            seconds: null
+          };
+        }
+        const clock = value.match(/^(\d+):(\d{2})$/);
+        if (clock) return {
+          weight: null,
+          seconds: Number(clock[1]) * 60 + Number(clock[2])
+        };
+        const seconds = value.match(/^(\d+)\s*(?:seconds?|secs?|s)$/i);
+        if (seconds) return {
+          weight: null,
+          seconds: Number(seconds[1])
+        };
+        return {
+          weight: null,
+          seconds: null
+        };
+      };
+      exports.readWeightText = readWeightText;
+      var showWeight = (weight, preferredUnit2) => {
+        if (!weight) return null;
+        const entered = `${formatAmount(weight.amount)} ${weight.unit}`;
+        if (weight.unit === preferredUnit2) return {
+          text: entered,
+          entered: null
+        };
+        return {
+          text: `${formatAmount(convertWeight(weight.amount, weight.unit, preferredUnit2))} ${preferredUnit2}`,
+          entered
+        };
+      };
+      exports.showWeight = showWeight;
+      var formatSeconds = (seconds) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+      exports.formatSeconds = formatSeconds;
+      var defaultUnit = (locale = "") => /-(US|LR|MM)\b/i.test(locale) ? "lbs" : "kg";
+      exports.defaultUnit = defaultUnit;
+    }
+  });
+
   // js-build-tools-cjs:dist/components/templates/lastSessionDisplay.js
   var require_lastSessionDisplay = __commonJS({
     "js-build-tools-cjs:dist/components/templates/lastSessionDisplay.js"(exports) {
@@ -1863,13 +1986,20 @@ var workoutPlanner = (() => {
         value: true
       });
       exports.lastSessionDisplay = exports.formatLastSession = void 0;
+      var _units2 = require_units();
       var {
         div,
         text: text2
       } = treeloomComponents;
-      var formatLastSession = (session) => session ? `Last time: ${session.weight_effort || "no weight recorded"}, ${session.sets}x${session.reps} on ${session.date}` : "No previous session for this exercise yet.";
+      var formatLastSession = (session, preferredUnit2 = "kg") => {
+        if (!session) return "No previous session for this exercise yet.";
+        const shown = (0, _units2.showWeight)((0, _units2.workoutWeight)(session), preferredUnit2);
+        const effort = shown ? shown.entered ? `${shown.text} (${shown.entered})` : shown.text : session.seconds ? `held ${(0, _units2.formatSeconds)(session.seconds)}` : "no weight recorded";
+        const work = session.reps ? `${session.sets}x${session.reps}` : `${session.sets} sets`;
+        return `Last time: ${effort}, ${work} on ${session.date}`;
+      };
       exports.formatLastSession = formatLastSession;
-      var lastSessionDisplay = (session = null) => div([text2(formatLastSession(session))], "last-session");
+      var lastSessionDisplay = (session = null, preferredUnit2 = "kg") => div([text2(formatLastSession(session, preferredUnit2))], "last-session");
       exports.lastSessionDisplay = lastSessionDisplay;
     }
   });
@@ -1898,14 +2028,25 @@ var workoutPlanner = (() => {
       });
       exports.wireLogWorkoutFormEvents = exports.readFormValues = exports.logWorkoutForm = void 0;
       var _localDate = require_localDate();
+      var _units2 = require_units();
       var {
         div,
         input,
-        button
+        button,
+        select: select2,
+        option: option2
       } = treeloomComponents;
       var logWorkoutForm = () => {
-        const weightEffortInput = input("text", "", null, [], void 0, {
-          placeholder: "Weight / effort (e.g. 120lbs)"
+        const weightInput = input("number", "", null, [], void 0, {
+          placeholder: "Weight",
+          min: "0",
+          step: "any"
+        });
+        const unitSelect = select2([option2("kg", "kg"), option2("lbs", "lbs")], "", {
+          "aria-label": "Unit the equipment uses"
+        });
+        const secondsInput = input("text", "", null, [], void 0, {
+          placeholder: "Time for holds (m:ss)"
         });
         const setsInput = input("number", "", null, [], void 0, {
           placeholder: "Sets",
@@ -1922,8 +2063,10 @@ var workoutPlanner = (() => {
         const submitButton = button("Log this workout");
         const updateButton = button("Update last entry");
         return {
-          container: div([weightEffortInput, setsInput, repsInput, noteInput, dateInput, submitButton, updateButton], "log-workout-form"),
-          weightEffortInput,
+          container: div([weightInput, unitSelect, secondsInput, setsInput, repsInput, noteInput, dateInput, submitButton, updateButton], "log-workout-form"),
+          weightInput,
+          unitSelect,
+          secondsInput,
           setsInput,
           repsInput,
           noteInput,
@@ -1934,7 +2077,9 @@ var workoutPlanner = (() => {
       };
       exports.logWorkoutForm = logWorkoutForm;
       var readFormValues = (form) => ({
-        weightEffort: form.weightEffortInput.element.value,
+        weight: form.weightInput.element.value,
+        unit: form.unitSelect.element.value,
+        seconds: (0, _units2.readWeightText)(form.secondsInput.element.value).seconds ?? "",
         sets: form.setsInput.element.value,
         reps: form.repsInput.element.value,
         note: form.noteInput.element.value,
@@ -1963,7 +2108,7 @@ var workoutPlanner = (() => {
       var {
         div,
         input,
-        select,
+        select: select2,
         option: option2,
         button
       } = treeloomComponents;
@@ -1976,11 +2121,11 @@ var workoutPlanner = (() => {
         });
         const muscleOptions = () => muscles.map((muscle) => option2(String(muscle.muscleId), muscle.name));
         const selectSize = String(Math.min(muscles.length, 6) || 1);
-        const primaryMusclesSelect = select(muscleOptions(), "", {
+        const primaryMusclesSelect = select2(muscleOptions(), "", {
           multiple: true,
           size: selectSize
         });
-        const secondaryMusclesSelect = select(muscleOptions(), "", {
+        const secondaryMusclesSelect = select2(muscleOptions(), "", {
           multiple: true,
           size: selectSize
         });
@@ -2174,6 +2319,7 @@ var workoutPlanner = (() => {
 
   // js-build-tools-cjs:dist/index.js
   init_process();
+  require_es_array_includes();
   require_es_json_stringify();
   var _musclePriorityList = require_musclePriorityList();
   var _exercisePicker = require_exercisePicker();
@@ -2181,9 +2327,11 @@ var workoutPlanner = (() => {
   var _logWorkoutForm = require_logWorkoutForm();
   var _addExerciseForm = require_addExerciseForm();
   var _browserReads = require_browserReads();
+  var _units = require_units();
   window.treeloom = treeloom;
   var {
     option,
+    select,
     text,
     main,
     header,
@@ -2195,16 +2343,42 @@ var workoutPlanner = (() => {
   var logForm;
   var addForm;
   var lastSessionId = null;
+  var lastSession = null;
+  var unitPicker;
+  var UNIT_KEY = "workoutPlanner.unit";
+  var readPreferredUnit = () => {
+    try {
+      const stored = window.localStorage.getItem(UNIT_KEY);
+      if (_units.WEIGHT_UNITS.includes(stored)) return stored;
+    } catch (error) {
+    }
+    return (0, _units.defaultUnit)(navigator.language);
+  };
+  var preferredUnit = readPreferredUnit();
+  var savePreferredUnit = (unit) => {
+    preferredUnit = unit;
+    try {
+      window.localStorage.setItem(UNIT_KEY, unit);
+    } catch (error) {
+    }
+  };
   var fillFormFrom = (session) => {
-    logForm.weightEffortInput.element.value = session ? session.weight_effort || "" : "";
+    const weight = session ? (0, _units.workoutWeight)(session) : null;
+    logForm.weightInput.element.value = weight ? String(weight.amount) : "";
+    logForm.unitSelect.element.value = weight ? weight.unit : preferredUnit;
+    logForm.secondsInput.element.value = session && session.seconds ? (0, _units.formatSeconds)(session.seconds) : "";
     logForm.setsInput.element.value = session ? session.sets : "";
     logForm.repsInput.element.value = session ? session.reps : "";
     logForm.noteInput.element.value = session ? session.note || "" : "";
   };
   var updateLastSession = (session) => {
     lastSessionId = session ? session._id : null;
+    lastSession = session;
     fillFormFrom(session);
-    lastSessionItem.children = [text((0, _lastSessionDisplay.formatLastSession)(session))];
+    showLastSession();
+  };
+  var showLastSession = () => {
+    lastSessionItem.children = [text((0, _lastSessionDisplay.formatLastSession)(lastSession, preferredUnit))];
     treeloom.updateChildNodes(lastSessionItem);
   };
   var onExerciseChange = (exerciseId) => {
@@ -2215,7 +2389,9 @@ var workoutPlanner = (() => {
     (0, _browserReads.getLastSession)(exerciseId).then(updateLastSession);
   };
   var onLogWorkout = ({
-    weightEffort,
+    weight,
+    unit,
+    seconds,
     sets,
     reps,
     note,
@@ -2232,7 +2408,9 @@ var workoutPlanner = (() => {
       },
       body: JSON.stringify({
         exerciseId,
-        weightEffort,
+        weight,
+        unit,
+        seconds,
         sets: sets || 0,
         reps: reps || 0,
         note,
@@ -2241,7 +2419,9 @@ var workoutPlanner = (() => {
     }).then((response) => response.json()).then(() => onExerciseChange(exerciseId));
   };
   var onUpdateWorkout = ({
-    weightEffort,
+    weight,
+    unit,
+    seconds,
     sets,
     reps,
     note
@@ -2256,7 +2436,9 @@ var workoutPlanner = (() => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        weightEffort,
+        weight,
+        unit,
+        seconds,
         sets: sets || 0,
         reps: reps || 0,
         note
@@ -2316,10 +2498,13 @@ var workoutPlanner = (() => {
     });
   };
   var renderPage = (priorityRows) => {
-    const mainHeader = header([heading(1, [text("Workout Planner")])]);
+    unitPicker = select([option("kg", "Weights in kg"), option("lbs", "Weights in lbs")], "unit-picker", {
+      "aria-label": "Show weights in"
+    });
+    const mainHeader = header([heading(1, [text("Workout Planner")]), unitPicker]);
     const priorityTable = (0, _musclePriorityList.musclePriorityList)(priorityRows);
     picker = (0, _exercisePicker.exercisePicker)(priorityRows);
-    lastSessionItem = (0, _lastSessionDisplay.lastSessionDisplay)(null);
+    lastSessionItem = (0, _lastSessionDisplay.lastSessionDisplay)(null, preferredUnit);
     logForm = (0, _logWorkoutForm.logWorkoutForm)();
     addForm = (0, _addExerciseForm.addExerciseForm)(priorityRows);
     const documentItem = treeloom.documentItem;
@@ -2337,6 +2522,11 @@ var workoutPlanner = (() => {
     (0, _exercisePicker.wireExercisePickerEvents)(picker, onMuscleChange, onExerciseChange);
     (0, _logWorkoutForm.wireLogWorkoutFormEvents)(logForm, onLogWorkout, onUpdateWorkout);
     (0, _addExerciseForm.wireAddExerciseFormEvents)(addForm, onAddExercise);
+    unitPicker.element.value = preferredUnit;
+    treeloom.fullAddEventListener("change", () => {
+      savePreferredUnit(unitPicker.element.value);
+      showLastSession();
+    }, "onUnitChange", null, null, unitPicker);
     if (priorityRows.length) {
       onMuscleChange(String(priorityRows[0].muscleId));
     }
