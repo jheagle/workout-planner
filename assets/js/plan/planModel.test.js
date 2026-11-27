@@ -1,11 +1,33 @@
 import { claudePlanModel, PlanModelError } from './planModel.js'
 
-// A stand-in for the Anthropic client: records the request, replies with the given message
+// A stand-in for the Anthropic client: records the request, replies with the given message, and plays its content
+// blocks to the stream's listeners first (a block start, then its text in two halves), like a real stream
+const fakeStream = message => {
+  const listeners = { streamEvent: [], text: [] }
+  const emit = (name, value) => listeners[name].forEach(listener => listener(value))
+  return {
+    on (name, listener) {
+      listeners[name].push(listener)
+      return this
+    },
+    finalMessage: async () => {
+      message.content.forEach(block => {
+        emit('streamEvent', { type: 'content_block_start', content_block: block })
+        if (block.type !== 'text') return
+        const half = Math.ceil(block.text.length / 2)
+        emit('text', block.text.slice(0, half))
+        emit('text', block.text.slice(half))
+      })
+      return message
+    }
+  }
+}
+
 const fakeClient = message => {
   const calls = []
   return {
     calls,
-    beta: { messages: { stream: params => { calls.push(params); return { finalMessage: async () => message } } } }
+    beta: { messages: { stream: params => { calls.push(params); return fakeStream(message) } } }
   }
 }
 
@@ -51,5 +73,19 @@ describe('claudePlanModel', () => {
   test('a reply that isn\'t JSON gives a null plan', async () => {
     const client = fakeClient(reply({ content: [{ type: 'text', text: 'not json' }] }))
     expect((await claudePlanModel({ client }).propose(request)).plan).toBeNull()
+  })
+
+  test('onProgress hears the request go out, the thinking, and the plan being written', async () => {
+    const heard = []
+    const model = claudePlanModel({ client: fakeClient(reply()), onProgress: progress => heard.push(progress) })
+    await model.propose(request)
+    const text = '{"summary":"s","weeks":[]}'
+    expect(heard).toEqual([
+      { phase: 'sent', characters: 0 },
+      { phase: 'thinking', characters: 0 },
+      { phase: 'writing', characters: 0 },
+      { phase: 'writing', characters: Math.ceil(text.length / 2) },
+      { phase: 'writing', characters: text.length }
+    ])
   })
 })

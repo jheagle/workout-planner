@@ -45,9 +45,12 @@ const parsePlan = text => {
  * @param {string} [options.model]
  * @param {string} [options.effort] - 'low' to 'max'
  * @param {number} [options.maxTokens]
+ * @param {Function} [options.onProgress] - called as the reply comes in, with `{phase, characters}`: phase 'sent'
+ * (the request is out), 'thinking' or 'writing'; characters is how much of the plan has been written so far. A plan
+ * takes minutes, so this is how a caller shows it is still working.
  * @returns {{name: string, propose: Function}}
  */
-export const claudePlanModel = ({ client, model = 'claude-opus-5-5', effort = 'high', maxTokens = 64000 } = {}) => {
+export const claudePlanModel = ({ client, model = 'claude-opus-5-5', effort = 'high', maxTokens = 64000, onProgress = () => {} } = {}) => {
   let anthropic = client
   return {
     name: model,
@@ -64,6 +67,17 @@ export const claudePlanModel = ({ client, model = 'claude-opus-5-5', effort = 'h
         output_config: { effort, format: { type: 'json_schema', schema } },
         system,
         messages
+      })
+      let characters = 0
+      onProgress({ phase: 'sent', characters })
+      stream.on('streamEvent', event => {
+        if (event.type !== 'content_block_start') return
+        if (event.content_block.type === 'thinking') onProgress({ phase: 'thinking', characters })
+        if (event.content_block.type === 'text') onProgress({ phase: 'writing', characters })
+      })
+      stream.on('text', delta => {
+        characters += delta.length
+        onProgress({ phase: 'writing', characters })
       })
       const message = await stream.finalMessage()
       if (message.stop_reason === 'refusal') {
