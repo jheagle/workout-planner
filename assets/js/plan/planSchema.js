@@ -25,7 +25,7 @@ const exercise = {
   properties: {
     exerciseId: { type: 'string', description: 'An exercise id from the context.' },
     equipmentId: {
-      type: ['string', 'null'],
+      anyOf: [{ type: 'string' }, { type: 'null' }],
       description: 'The loaded equipment the weight is for, from that exercise\'s equipment; null when it has none.'
     },
     sets: { type: 'integer' },
@@ -90,4 +90,6 @@ export const planSchema = {
  * @property {{amount: number, unit: string}} weight - the weight to lift
  * @property {number} reps - for this many reps
  * @property {number} weeks - 4 to 12
+ * @property {string} [startDate] - 'YYYY-MM-DD'; the plan starts that week's Monday (the Monday on or after it).
+ * Without it, the Monday after today.
  */

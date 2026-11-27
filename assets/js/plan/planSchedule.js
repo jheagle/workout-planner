@@ -35,14 +35,28 @@ export const DEFAULT_DELOAD_EVERY = 4
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000
 
 /**
- * The first day of a plan: the next Monday after today (a plan made on a Monday starts a week later, so there's
- * time to read it).
+ * A 'YYYY-MM-DD' date as local midnight, or null when it isn't a real date.
+ * @param {string} text
+ * @returns {(Date|null)}
+ */
+export const parseDate = text => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(text))
+  if (!match) return null
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+  return localDate(date) === text ? date : null
+}
+
+/**
+ * The first day of a plan. With a start date (travel, a vacation), the Monday on or after it; without one, the
+ * next Monday after today (a plan made on a Monday starts a week later, so there's time to read it).
  * @param {Date} today
+ * @param {string} [startDate] - 'YYYY-MM-DD'
  * @returns {Date} local midnight
  */
-export const planStart = today => {
-  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-  const daysToMonday = ((8 - start.getDay()) % 7) || 7
+export const planStart = (today, startDate) => {
+  const chosen = startDate ? parseDate(startDate) : null
+  const start = chosen || new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const daysToMonday = chosen ? (8 - start.getDay()) % 7 : ((8 - start.getDay()) % 7) || 7
   start.setDate(start.getDate() + daysToMonday)
   return start
 }
@@ -79,17 +93,18 @@ const isLighter = (week, weeks, deloadEvery) =>
  */
 
 /**
- * The schedule for a plan of `weeks` weeks starting the Monday after `today`.
+ * The schedule for a plan of `weeks` weeks, starting on `startDate`'s Monday or the Monday after `today`.
  * @param {Object} options
  * @param {number} options.weeks
  * @param {GymProfile} options.profile - reads `deloadEvery` (default 4) and `phases`
  * @param {Date} options.today
+ * @param {string} [options.startDate] - 'YYYY-MM-DD'
  * @returns {ScheduleWeek[]}
  */
-export const buildSchedule = ({ weeks, profile, today }) => {
+export const buildSchedule = ({ weeks, profile, today, startDate }) => {
   const count = Number.isInteger(weeks) && weeks > 0 ? weeks : 0
   const deloadEvery = profile.deloadEvery === undefined ? DEFAULT_DELOAD_EVERY : profile.deloadEvery
-  const start = planStart(today)
+  const start = planStart(today, startDate)
   return Array.from({ length: count }, (_, index) => {
     const week = index + 1
     // Noon, so a daylight-saving change never moves the date

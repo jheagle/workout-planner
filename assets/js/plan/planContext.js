@@ -133,7 +133,7 @@ export const buildPlanContext = ({ goal, profile, rows, today = new Date() }) =>
       targetMax: { amount: round1(estimateMax(convertWeight(goal.weight.amount, goal.weight.unit, profile.unit), goal.reps)), unit: profile.unit }
     },
     profile,
-    schedule: buildSchedule({ weeks: goal.weeks, profile, today }),
+    schedule: buildSchedule({ weeks: goal.weeks, profile, today, startDate: goal.startDate }),
     exercises,
     musclePriority: priority.map(({ muscleId, name, weeklySets, daysSinceLastWorked, needsPriority }) => ({
       muscleId: String(muscleId), name, weeklySets, daysSinceLastWorked: Number.isFinite(daysSinceLastWorked) ? daysSinceLastWorked : null, needsPriority

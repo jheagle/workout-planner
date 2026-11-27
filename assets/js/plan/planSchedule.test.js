@@ -1,4 +1,4 @@
-import { buildSchedule, phaseOn, planStart, reachableMax } from './planSchedule.js'
+import { buildSchedule, parseDate, phaseOn, planStart, reachableMax } from './planSchedule.js'
 import { localDate } from '../data/localDate.js'
 
 const kinds = schedule => schedule.map(week => week.kind)
@@ -11,6 +11,20 @@ describe('planStart', () => {
 
   test('a plan made on a Monday starts a week later', () => {
     expect(localDate(planStart(new Date(2026, 10, 30, 21, 30)))).toBe('2026-12-07')
+  })
+
+  test('a chosen start date starts on its Monday, or the Monday after it', () => {
+    const today = new Date(2026, 10, 26)
+    expect(localDate(planStart(today, '2026-12-07'))).toBe('2026-12-07') // a Monday: that day
+    expect(localDate(planStart(today, '2026-12-05'))).toBe('2026-12-07') // a Saturday
+  })
+})
+
+describe('parseDate', () => {
+  test('reads real YYYY-MM-DD dates only', () => {
+    expect(localDate(parseDate('2027-02-28'))).toBe('2027-02-28')
+    expect(parseDate('2027-02-30')).toBeNull()
+    expect(parseDate('Feb 3')).toBeNull()
   })
 })
 
