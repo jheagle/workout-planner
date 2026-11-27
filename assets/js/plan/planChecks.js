@@ -11,12 +11,12 @@
 
 import { convertWeight, formatAmount } from '../data/units.js'
 import { canMake, roundToEquipment } from './gymProfile.js'
+import { PHASE_PACE, reachableMax } from './planSchedule.js'
 
 export const LIMITS = {
   minWeeks: 4,
   maxWeeks: 12,
   maxGoalReps: 20,
-  maxGainPerWeek: 0.02, // a goal's implied max may be at most 2% a week above the current estimated max
   minSets: 1,
   maxSets: 8,
   minReps: 1,
@@ -26,7 +26,9 @@ export const LIMITS = {
   maxWeeklySets: 20, // weighted sets per muscle per week (10-20 is the common range for growth)
   hardDaySets: 3, // weighted sets on a day that make it a hard day for that muscle
   minDaysBetweenHardDays: 2, // no muscle hard on two days in a row
-  maxJump: 0.1 // the top weight may rise at most 10% a week (or one step, when that's more)
+  lighterSetsShare: 0.6, // a lighter week has at most 60% of the sets of the build week before it
+  taperSetsShare: 0.7 // the taper week has at most 70%
+  // How fast weights may climb depends on the phase: PHASE_PACE in planSchedule.js
 }
 
 /**
@@ -41,6 +43,13 @@ const EPSILON = 1e-6
 const error = (path, message) => ({ path, message })
 const weightText = weight => `${formatAmount(weight.amount)} ${weight.unit}`
 const isWholeIn = (value, min, max) => Number.isInteger(value) && value >= min && value <= max
+
+// 'all bulk', or '2 maintain, 4 cut': the phases a goal's weeks fall in
+const phaseText = schedule => {
+  const counts = new Map()
+  schedule.forEach(({ phase }) => counts.set(phase, (counts.get(phase) || 0) + 1))
+  return counts.size === 1 ? `all ${[...counts.keys()][0]}` : [...counts].map(([phase, count]) => `${count} ${phase}`).join(', ')
+}
 
 /* ------------------------------------------------------------------------------------------------------------------
  * The goal
@@ -73,10 +82,10 @@ export const checkGoal = (goal, context) => {
 
   const now = exercise.estimatedMax.amount
   const needed = context.goal.targetMax.amount
-  const reachable = now * (1 + LIMITS.maxGainPerWeek * goal.weeks)
+  const reachable = reachableMax(now, context.schedule)
   if (needed > reachable) {
     errors.push(error('goal', `${goal.reps} x ${weightText(goal.weight)} needs a max of about ${formatAmount(needed)} ${context.profile.unit}; ` +
-      `the estimate now is ${formatAmount(now)}, and ${goal.weeks} weeks can realistically reach about ${formatAmount(reachable)}`))
+      `the estimate now is ${formatAmount(now)}, and ${goal.weeks} weeks (${phaseText(context.schedule)}) can realistically reach about ${formatAmount(reachable)}`))
   }
   return errors
 }
@@ -146,6 +155,35 @@ const weightedSetsByMuscleAndDay = items => {
     })
   })
   return totals
+}
+
+/** All the sets planned in each week, by week index. */
+const setsByWeek = (items, weekCount) => {
+  const totals = Array(weekCount).fill(0)
+  known(items).forEach(({ weekIndex, item }) => {
+    if (weekIndex < weekCount && Number.isInteger(item.sets)) totals[weekIndex] += item.sets
+  })
+  return totals
+}
+
+/** The heaviest entry of each loaded lift in each week: exerciseId -> weekIndex -> entry. */
+const topWeights = items => {
+  const tops = new Map()
+  known(items).filter(({ item, exercise }) => exercise.loadedEquipment && item.weight).forEach(entry => {
+    if (!tops.has(entry.exercise.id)) tops.set(entry.exercise.id, new Map())
+    const byWeek = tops.get(entry.exercise.id)
+    const top = byWeek.get(entry.weekIndex)
+    if (!top || entry.item.weight.amount > top.item.weight.amount) byWeek.set(entry.weekIndex, entry)
+  })
+  return tops
+}
+
+/** The index of the last build week before this one, or -1. */
+const buildWeekBefore = (schedule, weekIndex) => {
+  for (let index = weekIndex - 1; index >= 0; index--) {
+    if (schedule[index].kind === 'build') return index
+  }
+  return -1
 }
 
 /* ------------------------------------------------------------------------------------------------------------------
@@ -275,36 +313,62 @@ const restBetweenHardDays = ({ items }, context) => {
 }
 
 /**
- * Each lift's top weight rises at most 10% a week (or one step of its equipment, when that's more), starting from
- * its last logged session. Dropping is always fine.
+ * Each lift's top weight rises at most its phase's jump a week (10% in a bulk, 5% in a cut; or one step of its
+ * equipment, when that's more), starting from its last logged session. A lighter week isn't the baseline for the
+ * week after it: the climb carries on from the build week before. Dropping is always fine.
  */
-const weightsRiseGradually = ({ items }, { profile }) => {
-  // The heaviest entry of each lift in each week: exerciseId -> weekIndex -> entry
-  const tops = new Map()
-  known(items).filter(({ item, exercise }) => exercise.loadedEquipment && item.weight).forEach(entry => {
-    if (!tops.has(entry.exercise.id)) tops.set(entry.exercise.id, new Map())
-    const byWeek = tops.get(entry.exercise.id)
-    const top = byWeek.get(entry.weekIndex)
-    if (!top || entry.item.weight.amount > top.item.weight.amount) byWeek.set(entry.weekIndex, entry)
-  })
-
+const weightsRiseGradually = ({ items }, { profile, schedule }) => {
   const errors = []
-  for (const byWeek of tops.values()) {
+  for (const byWeek of topWeights(items).values()) {
     const { exercise } = byWeek.values().next().value
     const equipment = profile.equipment[exercise.loadedEquipment]
-    const allowedAfter = amount => Math.max(amount * (1 + LIMITS.maxJump), amount + equipment.step)
     const last = exercise.last && exercise.last.weight
     let previous = last ? { amount: convertWeight(last.amount, last.unit, equipment.unit), label: 'the last session' } : null
     ;[...byWeek.keys()].sort((first, second) => first - second).forEach(weekIndex => {
       const { path, item } = byWeek.get(weekIndex)
       if (item.weight.unit !== equipment.unit) return // weightsFitEquipment reports it
-      if (previous && item.weight.amount > allowedAfter(previous.amount) + EPSILON) {
+      const week = schedule[weekIndex]
+      const { maxJump } = PHASE_PACE[week ? week.phase : 'maintain']
+      const allowed = previous && Math.max(previous.amount * (1 + maxJump), previous.amount + equipment.step)
+      if (previous && item.weight.amount > allowed + EPSILON) {
         errors.push(error(`${path}.weight`, `${exercise.name} jumps from ${formatAmount(previous.amount)} to ${weightText(item.weight)} ` +
-          `after ${previous.label}; at most ${formatAmount(allowedAfter(previous.amount))} ${equipment.unit}`))
+          `after ${previous.label}; at most ${formatAmount(allowed)} ${equipment.unit}${week ? ` in a ${week.phase} week` : ''}`))
       }
-      previous = { amount: item.weight.amount, label: `week ${weekIndex + 1}` }
+      if (!week || week.kind !== 'lighter') previous = { amount: item.weight.amount, label: `week ${weekIndex + 1}` }
     })
   }
+  return errors
+}
+
+/**
+ * A lighter week has at most 60% of the sets of the build week before it, and no lift heavier than in that week.
+ * The taper week has at most 70% of the sets (its weights follow the usual climb).
+ */
+const lighterWeeksAreLighter = ({ weeks, items }, { schedule }) => {
+  if (weeks.length !== schedule.length) return [] // weeksMatchGoal reports it
+  const sets = setsByWeek(items, weeks.length)
+  const tops = topWeights(items)
+  const errors = []
+  schedule.forEach(({ kind }, weekIndex) => {
+    if (kind !== 'lighter' && kind !== 'taper') return
+    const before = buildWeekBefore(schedule, weekIndex)
+    if (before < 0) return
+    const share = kind === 'lighter' ? LIMITS.lighterSetsShare : LIMITS.taperSetsShare
+    const most = Math.floor(sets[before] * share + EPSILON)
+    if (sets[weekIndex] > most) {
+      errors.push(error(`weeks[${weekIndex}]`, `week ${weekIndex + 1} is a ${kind} week: at most ${most} sets ` +
+        `(${Math.round(share * 100)}% of week ${before + 1}'s ${sets[before]}); it has ${sets[weekIndex]}`))
+    }
+    if (kind !== 'lighter') return
+    for (const byWeek of tops.values()) {
+      const entry = byWeek.get(weekIndex)
+      const build = byWeek.get(before)
+      if (entry && build && entry.item.weight.unit === build.item.weight.unit && entry.item.weight.amount > build.item.weight.amount + EPSILON) {
+        errors.push(error(`${entry.path}.weight`, `${entry.exercise.name} is heavier than in week ${before + 1} ` +
+          `(${weightText(build.item.weight)}); a lighter week keeps it there or below`))
+      }
+    }
+  })
   return errors
 }
 
@@ -342,6 +406,7 @@ export const PLAN_RULES = [
   weeklySetsPerMuscle,
   restBetweenHardDays,
   weightsRiseGradually,
+  lighterWeeksAreLighter,
   lastWeekTestsGoal
 ]
 

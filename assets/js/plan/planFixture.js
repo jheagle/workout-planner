@@ -59,20 +59,21 @@ export const fixtureGoal = () => ({ exerciseId: 'bench', weight: { amount: 175, 
 
 export const fixtureToday = () => new Date(2026, 10, 26)
 
-const day = (dayOfWeek, bench, squat) => ({
+const day = (dayOfWeek, bench, squat, sets) => ({
   dayOfWeek,
   exercises: [
-    { exerciseId: 'bench', equipmentId: 'barbell', sets: 3, reps: 5, weight: { amount: bench, unit: 'lbs' } },
-    { exerciseId: 'squat', equipmentId: 'barbell', sets: 3, reps: 8, weight: { amount: squat, unit: 'lbs' } },
-    { exerciseId: 'pullup', equipmentId: null, sets: 3, reps: 8, weight: null }
+    { exerciseId: 'bench', equipmentId: 'barbell', sets, reps: 5, weight: { amount: bench, unit: 'lbs' } },
+    { exerciseId: 'squat', equipmentId: 'barbell', sets, reps: 8, weight: { amount: squat, unit: 'lbs' } },
+    { exerciseId: 'pullup', equipmentId: null, sets, reps: 8, weight: null }
   ]
 })
 
-// Mon, Wed, Fri; the bench climbs 165 -> 170 -> 175 -> 175 and the squat from about 220 lbs (100 kg)
+// Mon, Wed, Fri; the bench climbs 165 -> 170 -> 175 -> 175 and the squat from about 220 lbs (100 kg). Week 3 is the
+// taper (2 sets instead of 3), week 4 the test.
 export const validPlan = () => ({
-  summary: 'Three full-body days a week, adding 5 lbs to the bench each week until the goal week.',
-  weeks: [[165, 225], [170, 230], [175, 235], [175, 240]].map(([bench, squat], index) => ({
+  summary: 'Three full-body days a week, adding 5 lbs to the bench each week, a lighter week 3, then the goal.',
+  weeks: [[165, 225, 3], [170, 230, 3], [175, 235, 2], [175, 240, 3]].map(([bench, squat, sets], index) => ({
     week: index + 1,
-    days: [day(1, bench, squat), day(3, bench, squat), day(5, bench, squat)]
+    days: [day(1, bench, squat, sets), day(3, bench, squat, sets), day(5, bench, squat, sets)]
   }))
 })
