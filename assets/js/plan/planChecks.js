@@ -3,7 +3,9 @@
  * (`weeks[1].days[0].exercises[2].weight`) and what's wrong with it, so one fix round can hand the model the list,
  * and the evals grade plans by the same checks. LJS-2, 2026-11-26.
  *
- * The limits are starting points, kept here as constants to tune from real plans.
+ * How it reads: `checkPlan` lays the plan out flat once (every day and every exercise with its path), then runs
+ * the rules in `PLAN_RULES`, one small function per rule, and collects their errors. To add a rule, write a function
+ * and list it there. The limits are starting points, kept in `LIMITS` to tune from real plans.
  * @module planChecks
  */
 
@@ -33,7 +35,16 @@ export const LIMITS = {
  * @property {string} message
  */
 
+// Weights compare with a little room for floating point (2.5 kg steps)
+const EPSILON = 1e-6
+
+const error = (path, message) => ({ path, message })
 const weightText = weight => `${formatAmount(weight.amount)} ${weight.unit}`
+const isWholeIn = (value, min, max) => Number.isInteger(value) && value >= min && value <= max
+
+/* ------------------------------------------------------------------------------------------------------------------
+ * The goal
+ * ---------------------------------------------------------------------------------------------------------------- */
 
 /**
  * Whether a goal can be planned for: its exercise is one this gym allows, and it's a strength goal v1 handles in a
@@ -44,29 +55,295 @@ const weightText = weight => `${formatAmount(weight.amount)} ${weight.unit}`
  */
 export const checkGoal = (goal, context) => {
   const errors = []
-  const add = (path, message) => errors.push({ path, message })
   const exercise = context.exercises.find(row => row.id === String(goal.exerciseId))
-  if (!exercise) add('goal.exerciseId', `exercise ${goal.exerciseId} isn't one this gym's equipment allows`)
-  if (!Number.isInteger(goal.weeks) || goal.weeks < LIMITS.minWeeks || goal.weeks > LIMITS.maxWeeks) {
-    add('goal.weeks', `must be a whole number of weeks from ${LIMITS.minWeeks} to ${LIMITS.maxWeeks}`)
+  if (!exercise) {
+    errors.push(error('goal.exerciseId', `exercise ${goal.exerciseId} isn't one this gym's equipment allows`))
   }
-  if (!Number.isInteger(goal.reps) || goal.reps < 1 || goal.reps > LIMITS.maxGoalReps) {
-    add('goal.reps', `must be a whole number from 1 to ${LIMITS.maxGoalReps}`)
+  if (!isWholeIn(goal.weeks, LIMITS.minWeeks, LIMITS.maxWeeks)) {
+    errors.push(error('goal.weeks', `must be a whole number of weeks from ${LIMITS.minWeeks} to ${LIMITS.maxWeeks}`))
+  }
+  if (!isWholeIn(goal.reps, 1, LIMITS.maxGoalReps)) {
+    errors.push(error('goal.reps', `must be a whole number from 1 to ${LIMITS.maxGoalReps}`))
   }
   if (!goal.weight || !(goal.weight.amount > 0) || !['kg', 'lbs'].includes(goal.weight.unit)) {
-    add('goal.weight', 'must be a weight above 0, in kg or lbs')
+    errors.push(error('goal.weight', 'must be a weight above 0, in kg or lbs'))
   }
+  // Pace is judged only for a well-formed goal on a lift with history to estimate from
   if (errors.length || !exercise.estimatedMax) return errors
 
   const now = exercise.estimatedMax.amount
-  const target = context.goal.targetMax.amount
+  const needed = context.goal.targetMax.amount
   const reachable = now * (1 + LIMITS.maxGainPerWeek * goal.weeks)
-  if (target > reachable) {
-    add('goal', `${goal.reps} x ${weightText(goal.weight)} needs a max of about ${formatAmount(target)} ${context.profile.unit}; ` +
-      `the estimate now is ${formatAmount(now)}, and ${goal.weeks} weeks can realistically reach about ${formatAmount(reachable)}`)
+  if (needed > reachable) {
+    errors.push(error('goal', `${goal.reps} x ${weightText(goal.weight)} needs a max of about ${formatAmount(needed)} ${context.profile.unit}; ` +
+      `the estimate now is ${formatAmount(now)}, and ${goal.weeks} weeks can realistically reach about ${formatAmount(reachable)}`))
   }
   return errors
 }
+
+/* ------------------------------------------------------------------------------------------------------------------
+ * The plan laid out flat
+ * ---------------------------------------------------------------------------------------------------------------- */
+
+/**
+ * @typedef {Object} PlanLayout
+ * @property {Object[]} weeks - the plan's weeks (none when it has none)
+ * @property {Array<{path: string, weekIndex: number, day: Object, dayNumber: number}>} days - dayNumber counts
+ * from the plan's first Monday (week 2's Monday is 8), so rest between days is a subtraction
+ * @property {Array<{path: string, weekIndex: number, dayNumber: number, item: Object, exercise: (Object|undefined)}>} items -
+ * every exercise in the plan, with its exercise from the context (undefined when the id isn't one)
+ */
+
+/**
+ * The plan as flat lists, each entry with its path, so every rule is a simple loop.
+ * @param {import('./planSchema.js').Plan} plan
+ * @param {import('./planContext.js').PlanContext} context
+ * @returns {PlanLayout}
+ */
+const layOut = (plan, context) => {
+  const exercisesById = new Map(context.exercises.map(exercise => [exercise.id, exercise]))
+  const weeks = Array.isArray(plan && plan.weeks) ? plan.weeks : []
+  const days = weeks.flatMap((week, weekIndex) => (Array.isArray(week.days) ? week.days : []).map((day, dayIndex) => ({
+    path: `weeks[${weekIndex}].days[${dayIndex}]`,
+    weekIndex,
+    day,
+    dayNumber: weekIndex * 7 + day.dayOfWeek
+  })))
+  const items = days.flatMap(({ path, weekIndex, day, dayNumber }) => (Array.isArray(day.exercises) ? day.exercises : []).map((item, itemIndex) => ({
+    path: `${path}.exercises[${itemIndex}]`,
+    weekIndex,
+    dayNumber,
+    item,
+    exercise: exercisesById.get(String(item.exerciseId))
+  })))
+  return { weeks, days, items }
+}
+
+// Most rules only look at exercises the context knows; an unknown one is reported once, by exercisesAreKnown
+const known = items => items.filter(({ exercise }) => exercise)
+
+const muscleName = (context, muscleId) => {
+  for (const exercise of context.exercises) {
+    const muscle = exercise.muscles.find(row => row.muscleId === muscleId)
+    if (muscle) return muscle.name
+  }
+  return muscleId
+}
+
+/**
+ * Weighted sets per muscle per day: each exercise's sets times the muscle's share of it (3 sets of bench at 50%
+ * triceps is 1.5 for triceps).
+ * @returns {Map<string, Map<number, number>>} muscleId -> dayNumber -> weighted sets
+ */
+const weightedSetsByMuscleAndDay = items => {
+  const totals = new Map()
+  known(items).forEach(({ dayNumber, item, exercise }) => {
+    const sets = Number.isInteger(item.sets) ? item.sets : 0
+    exercise.muscles.forEach(({ muscleId, share }) => {
+      if (!totals.has(muscleId)) totals.set(muscleId, new Map())
+      const byDay = totals.get(muscleId)
+      byDay.set(dayNumber, (byDay.get(dayNumber) || 0) + sets * share / 100)
+    })
+  })
+  return totals
+}
+
+/* ------------------------------------------------------------------------------------------------------------------
+ * The rules: each takes (layout, context) and returns its errors
+ * ---------------------------------------------------------------------------------------------------------------- */
+
+/** The plan has as many weeks as the goal. */
+const weeksMatchGoal = ({ weeks }, { goal }) =>
+  weeks.length === goal.weeks ? [] : [error('weeks', `has ${weeks.length} weeks; the goal is ${goal.weeks} weeks`)]
+
+/** Weeks are numbered 1, 2, 3, ... in order. */
+const weeksAreNumbered = ({ weeks }) => weeks
+  .map((week, index) => week.week === index + 1 ? null : error(`weeks[${index}].week`, `should be ${index + 1}`))
+  .filter(Boolean)
+
+/** No week has more training days than the profile allows. */
+const daysFitTheWeek = ({ weeks }, { profile }) => weeks
+  .map((week, index) => {
+    const count = Array.isArray(week.days) ? week.days.length : 0
+    return count > profile.daysPerWeek ? error(`weeks[${index}].days`, `has ${count} training days; at most ${profile.daysPerWeek}`) : null
+  })
+  .filter(Boolean)
+
+/** Each day is a weekday from 1 (Monday) to 7 (Sunday), once per week. */
+const weekdaysAreValid = ({ days }) => {
+  const seen = new Set()
+  return days.flatMap(({ path, weekIndex, day }) => {
+    const key = `${weekIndex}:${day.dayOfWeek}`
+    if (!isWholeIn(day.dayOfWeek, 1, 7)) return [error(`${path}.dayOfWeek`, 'must be 1 (Monday) to 7 (Sunday)')]
+    if (seen.has(key)) return [error(`${path}.dayOfWeek`, `day ${day.dayOfWeek} is already in this week`)]
+    seen.add(key)
+    return []
+  })
+}
+
+/** Every training day has at least one exercise. */
+const daysHaveExercises = ({ days }) => days
+  .filter(({ day }) => !Array.isArray(day.exercises) || !day.exercises.length)
+  .map(({ path }) => error(`${path}.exercises`, 'a training day needs at least one exercise'))
+
+/** Every exercise is one from the context (which already leaves out the no-gos), and not on the no-go list. */
+const exercisesAreKnown = ({ items }, { profile }) => {
+  const avoid = new Set((profile.avoid || []).map(String))
+  return items.flatMap(({ path, item, exercise }) => {
+    if (!exercise) return [error(`${path}.exerciseId`, `${item.exerciseId} isn't an exercise in the context`)]
+    if (avoid.has(exercise.id)) return [error(`${path}.exerciseId`, `${exercise.name} is on the no-go list`)]
+    return []
+  })
+}
+
+/** Sets and reps are whole numbers in range. */
+const setsAndRepsInRange = ({ items }) => known(items).flatMap(({ path, item }) => [
+  isWholeIn(item.sets, LIMITS.minSets, LIMITS.maxSets) ? null : error(`${path}.sets`, `must be a whole number from ${LIMITS.minSets} to ${LIMITS.maxSets}`),
+  isWholeIn(item.reps, LIMITS.minReps, LIMITS.maxReps) ? null : error(`${path}.reps`, `must be a whole number from ${LIMITS.minReps} to ${LIMITS.maxReps}`)
+].filter(Boolean))
+
+/**
+ * A loaded exercise names its equipment and has a weight that equipment can make (the error says the nearest it
+ * can); a bodyweight exercise has neither.
+ */
+const weightsFitEquipment = ({ items }, { profile }) => known(items).flatMap(({ path, item, exercise }) => {
+  const equipmentId = exercise.loadedEquipment
+  if (!equipmentId) {
+    return [
+      item.equipmentId === null ? null : error(`${path}.equipmentId`, `${exercise.name} has no loaded equipment; use null`),
+      item.weight === null ? null : error(`${path}.weight`, `${exercise.name} takes no weight; use null`)
+    ].filter(Boolean)
+  }
+  const equipment = profile.equipment[equipmentId]
+  const errors = []
+  if (item.equipmentId !== equipmentId) errors.push(error(`${path}.equipmentId`, `should be ${equipmentId}`))
+  if (!item.weight) {
+    errors.push(error(`${path}.weight`, `${exercise.name} needs a weight on the ${equipmentId}`))
+  } else if (!canMake(item.weight, equipment)) {
+    const range = `${equipment.unit}, from ${equipment.min} in steps of ${equipment.step}${equipment.max !== undefined ? ` up to ${equipment.max}` : ''}`
+    errors.push(error(`${path}.weight`, `the ${equipmentId} can't make ${weightText(item.weight)} (${range}); ` +
+      `nearest is ${weightText(roundToEquipment(item.weight, equipment))}`))
+  }
+  return errors
+})
+
+/** A day's sets fit in the session: a warm-up, then each set with its rest. */
+const sessionsFitTheTime = ({ days }, { profile }) => days.flatMap(({ path, day }) => {
+  const sets = (day.exercises || []).reduce((total, item) => total + (Number.isInteger(item.sets) ? item.sets : 0), 0)
+  const minutes = LIMITS.warmUpMinutes + sets * LIMITS.minutesPerSet
+  return minutes > profile.sessionMinutes
+    ? [error(`${path}.exercises`, `${sets} sets take about ${formatAmount(minutes)} minutes; the session is ${profile.sessionMinutes}`)]
+    : []
+})
+
+/** Every must-include exercise is in every week. */
+const mustIncludesEveryWeek = ({ weeks, items }, { profile, exercises }) => weeks.flatMap((week, weekIndex) => {
+  const inWeek = new Set(known(items).filter(entry => entry.weekIndex === weekIndex).map(({ exercise }) => exercise.id))
+  return (profile.mustInclude || []).map(String).filter(id => !inWeek.has(id)).map(id => {
+    const exercise = exercises.find(row => row.id === id)
+    return error(`weeks[${weekIndex}].days`, `must include ${exercise ? exercise.name : id} every week`)
+  })
+})
+
+/** No muscle gets more than the weekly limit of weighted sets in any week. */
+const weeklySetsPerMuscle = ({ items }, context) => {
+  const errors = []
+  for (const [muscleId, byDay] of weightedSetsByMuscleAndDay(items)) {
+    for (let week = 0; week < context.goal.weeks; week++) {
+      const total = [...byDay].filter(([day]) => Math.ceil(day / 7) - 1 === week).reduce((sum, [, sets]) => sum + sets, 0)
+      if (total > LIMITS.maxWeeklySets + EPSILON) {
+        errors.push(error(`weeks[${week}]`, `${muscleName(context, muscleId)} gets ${formatAmount(total)} weighted sets; at most ${LIMITS.maxWeeklySets} a week`))
+      }
+    }
+  }
+  return errors
+}
+
+/** A muscle worked hard one day gets the next day off from hard work (also from a Sunday into the next Monday). */
+const restBetweenHardDays = ({ items }, context) => {
+  const errors = []
+  for (const [muscleId, byDay] of weightedSetsByMuscleAndDay(items)) {
+    const hardDays = [...byDay].filter(([, sets]) => sets >= LIMITS.hardDaySets).map(([day]) => day).sort((first, second) => first - second)
+    hardDays.slice(1).forEach((day, index) => {
+      if (day - hardDays[index] >= LIMITS.minDaysBetweenHardDays) return
+      const week = Math.ceil(day / 7) - 1
+      errors.push(error(`weeks[${week}]`, `${muscleName(context, muscleId)} is worked hard (${LIMITS.hardDaySets}+ weighted sets) on two days in a row ` +
+        `(day ${day - week * 7}); leave a day between`))
+    })
+  }
+  return errors
+}
+
+/**
+ * Each lift's top weight rises at most 10% a week (or one step of its equipment, when that's more), starting from
+ * its last logged session. Dropping is always fine.
+ */
+const weightsRiseGradually = ({ items }, { profile }) => {
+  // The heaviest entry of each lift in each week: exerciseId -> weekIndex -> entry
+  const tops = new Map()
+  known(items).filter(({ item, exercise }) => exercise.loadedEquipment && item.weight).forEach(entry => {
+    if (!tops.has(entry.exercise.id)) tops.set(entry.exercise.id, new Map())
+    const byWeek = tops.get(entry.exercise.id)
+    const top = byWeek.get(entry.weekIndex)
+    if (!top || entry.item.weight.amount > top.item.weight.amount) byWeek.set(entry.weekIndex, entry)
+  })
+
+  const errors = []
+  for (const byWeek of tops.values()) {
+    const { exercise } = byWeek.values().next().value
+    const equipment = profile.equipment[exercise.loadedEquipment]
+    const allowedAfter = amount => Math.max(amount * (1 + LIMITS.maxJump), amount + equipment.step)
+    const last = exercise.last && exercise.last.weight
+    let previous = last ? { amount: convertWeight(last.amount, last.unit, equipment.unit), label: 'the last session' } : null
+    ;[...byWeek.keys()].sort((first, second) => first - second).forEach(weekIndex => {
+      const { path, item } = byWeek.get(weekIndex)
+      if (item.weight.unit !== equipment.unit) return // weightsFitEquipment reports it
+      if (previous && item.weight.amount > allowedAfter(previous.amount) + EPSILON) {
+        errors.push(error(`${path}.weight`, `${exercise.name} jumps from ${formatAmount(previous.amount)} to ${weightText(item.weight)} ` +
+          `after ${previous.label}; at most ${formatAmount(allowedAfter(previous.amount))} ${equipment.unit}`))
+      }
+      previous = { amount: item.weight.amount, label: `week ${weekIndex + 1}` }
+    })
+  }
+  return errors
+}
+
+/** The last week tests the goal: its lift for the goal's reps, at the goal's weight (rounded to the equipment) or more. */
+const lastWeekTestsGoal = ({ weeks, items }, { goal, profile, exercises }) => {
+  const exercise = exercises.find(row => row.id === goal.exerciseId)
+  // A plan of the wrong length is already an error, and an unplannable goal is checkGoal's
+  if (weeks.length !== goal.weeks || !exercise) return []
+  const lastWeek = weeks.length - 1
+  const equipment = exercise.loadedEquipment ? profile.equipment[exercise.loadedEquipment] : null
+  const target = equipment ? roundToEquipment(goal.weight, equipment) : null
+  const heavyEnough = weight => !target || (weight && weight.unit === target.unit && weight.amount >= target.amount - EPSILON)
+  const tested = known(items).some(({ weekIndex, item, exercise: planned }) =>
+    weekIndex === lastWeek && planned.id === exercise.id && item.reps >= goal.reps && heavyEnough(item.weight))
+  return tested
+    ? []
+    : [error(`weeks[${lastWeek}]`, `the last week must test the goal: ${exercise.name} for ${goal.reps} reps${target ? ` at ${weightText(target)} or more` : ''}`)]
+}
+
+/**
+ * Every rule a plan must pass, in the order their errors are listed: the plan's shape, then each exercise, then
+ * each session and week, then progress over the weeks.
+ */
+export const PLAN_RULES = [
+  weeksMatchGoal,
+  weeksAreNumbered,
+  daysFitTheWeek,
+  weekdaysAreValid,
+  daysHaveExercises,
+  exercisesAreKnown,
+  setsAndRepsInRange,
+  weightsFitEquipment,
+  sessionsFitTheTime,
+  mustIncludesEveryWeek,
+  weeklySetsPerMuscle,
+  restBetweenHardDays,
+  weightsRiseGradually,
+  lastWeekTestsGoal
+]
 
 /**
  * Every problem with a plan, or none.
@@ -75,186 +352,8 @@ export const checkGoal = (goal, context) => {
  * @returns {PlanError[]}
  */
 export const checkPlan = (plan, context) => {
-  const errors = []
-  const add = (path, message) => errors.push({ path, message })
-  const { goal, profile } = context
-  const exercisesById = new Map(context.exercises.map(exercise => [exercise.id, exercise]))
-  const avoid = new Set((profile.avoid || []).map(String))
-  const weeks = Array.isArray(plan && plan.weeks) ? plan.weeks : []
-
-  if (weeks.length !== goal.weeks) add('weeks', `has ${weeks.length} weeks; the goal is ${goal.weeks} weeks`)
-
-  // Gathered while walking the plan, for the checks across days and weeks
-  const setsByMuscleDay = new Map() // muscleId -> Map(absolute day -> weighted sets)
-  const topWeights = new Map() // exerciseId -> Map(week index -> {amount, unit, path})
-
-  weeks.forEach((week, weekIndex) => {
-    const weekPath = `weeks[${weekIndex}]`
-    if (week.week !== weekIndex + 1) add(`${weekPath}.week`, `should be ${weekIndex + 1}`)
-    const days = Array.isArray(week.days) ? week.days : []
-    if (days.length > profile.daysPerWeek) add(`${weekPath}.days`, `has ${days.length} training days; at most ${profile.daysPerWeek}`)
-    const seenDays = new Set()
-    const weekExercises = new Set()
-
-    days.forEach((day, dayIndex) => {
-      const dayPath = `${weekPath}.days[${dayIndex}]`
-      if (!Number.isInteger(day.dayOfWeek) || day.dayOfWeek < 1 || day.dayOfWeek > 7) {
-        add(`${dayPath}.dayOfWeek`, 'must be 1 (Monday) to 7 (Sunday)')
-      } else if (seenDays.has(day.dayOfWeek)) {
-        add(`${dayPath}.dayOfWeek`, `day ${day.dayOfWeek} is already in this week`)
-      }
-      seenDays.add(day.dayOfWeek)
-      const absoluteDay = weekIndex * 7 + day.dayOfWeek
-      const items = Array.isArray(day.exercises) ? day.exercises : []
-      if (!items.length) add(`${dayPath}.exercises`, 'a training day needs at least one exercise')
-
-      let totalSets = 0
-      items.forEach((item, itemIndex) => {
-        const path = `${dayPath}.exercises[${itemIndex}]`
-        const exercise = exercisesById.get(String(item.exerciseId))
-        if (!exercise) {
-          add(`${path}.exerciseId`, `${item.exerciseId} isn't an exercise in the context`)
-          return
-        }
-        if (avoid.has(exercise.id)) add(`${path}.exerciseId`, `${exercise.name} is on the no-go list`)
-        weekExercises.add(exercise.id)
-
-        if (!Number.isInteger(item.sets) || item.sets < LIMITS.minSets || item.sets > LIMITS.maxSets) {
-          add(`${path}.sets`, `must be a whole number from ${LIMITS.minSets} to ${LIMITS.maxSets}`)
-        }
-        if (!Number.isInteger(item.reps) || item.reps < LIMITS.minReps || item.reps > LIMITS.maxReps) {
-          add(`${path}.reps`, `must be a whole number from ${LIMITS.minReps} to ${LIMITS.maxReps}`)
-        }
-        const sets = Number.isInteger(item.sets) ? item.sets : 0
-        totalSets += sets
-
-        checkWeight(item, exercise, profile, path, add)
-        if (item.weight && exercise.loadedEquipment) {
-          if (!topWeights.has(exercise.id)) topWeights.set(exercise.id, new Map())
-          const tops = topWeights.get(exercise.id)
-          const top = tops.get(weekIndex)
-          if (!top || item.weight.amount > top.amount) tops.set(weekIndex, { ...item.weight, path: `${path}.weight` })
-        }
-
-        exercise.muscles.forEach(({ muscleId, share }) => {
-          if (!setsByMuscleDay.has(muscleId)) setsByMuscleDay.set(muscleId, new Map())
-          const byDay = setsByMuscleDay.get(muscleId)
-          byDay.set(absoluteDay, (byDay.get(absoluteDay) || 0) + sets * share / 100)
-        })
-      })
-
-      const minutes = LIMITS.warmUpMinutes + totalSets * LIMITS.minutesPerSet
-      if (minutes > profile.sessionMinutes) {
-        add(`${dayPath}.exercises`, `${totalSets} sets take about ${formatAmount(minutes)} minutes; the session is ${profile.sessionMinutes}`)
-      }
-    })
-
-    ;(profile.mustInclude || []).map(String).forEach(id => {
-      if (!weekExercises.has(id)) {
-        const exercise = exercisesById.get(id)
-        add(`${weekPath}.days`, `must include ${exercise ? exercise.name : id} every week`)
-      }
-    })
-  })
-
-  checkVolume(setsByMuscleDay, context, add)
-  checkRecovery(setsByMuscleDay, context, add)
-  checkJumps(topWeights, exercisesById, profile, add)
-  checkGoalReached(weeks, goal, exercisesById, profile, add)
-  return errors
-}
-
-const checkWeight = (item, exercise, profile, path, add) => {
-  const equipmentId = exercise.loadedEquipment
-  if (!equipmentId) {
-    if (item.equipmentId !== null) add(`${path}.equipmentId`, `${exercise.name} has no loaded equipment; use null`)
-    if (item.weight !== null) add(`${path}.weight`, `${exercise.name} takes no weight; use null`)
-    return
-  }
-  if (item.equipmentId !== equipmentId) add(`${path}.equipmentId`, `should be ${equipmentId}`)
-  const equipment = profile.equipment[equipmentId]
-  if (!item.weight) {
-    add(`${path}.weight`, `${exercise.name} needs a weight on the ${equipmentId}`)
-    return
-  }
-  if (!canMake(item.weight, equipment)) {
-    const nearest = roundToEquipment(item.weight, equipment)
-    add(`${path}.weight`, `the ${equipmentId} can't make ${weightText(item.weight)} ` +
-      `(${equipment.unit}, from ${equipment.min} in steps of ${equipment.step}${equipment.max !== undefined ? ` up to ${equipment.max}` : ''}); ` +
-      `nearest is ${weightText(nearest)}`)
-  }
-}
-
-const muscleNames = context => {
-  const names = new Map(context.musclePriority.map(row => [row.muscleId, row.name]))
-  context.exercises.forEach(exercise => exercise.muscles.forEach(({ muscleId, name }) => names.set(muscleId, name)))
-  return names
-}
-
-const checkVolume = (setsByMuscleDay, context, add) => {
-  const names = muscleNames(context)
-  for (const [muscleId, byDay] of setsByMuscleDay) {
-    for (let week = 0; week < context.goal.weeks; week++) {
-      const total = [...byDay].filter(([day]) => day > week * 7 && day <= (week + 1) * 7).reduce((sum, [, sets]) => sum + sets, 0)
-      if (total > LIMITS.maxWeeklySets + 1e-6) {
-        add(`weeks[${week}]`, `${names.get(muscleId) || muscleId} gets ${formatAmount(total)} weighted sets; at most ${LIMITS.maxWeeklySets} a week`)
-      }
-    }
-  }
-}
-
-const checkRecovery = (setsByMuscleDay, context, add) => {
-  const names = muscleNames(context)
-  for (const [muscleId, byDay] of setsByMuscleDay) {
-    const hardDays = [...byDay].filter(([, sets]) => sets >= LIMITS.hardDaySets).map(([day]) => day).sort((first, second) => first - second)
-    for (let index = 1; index < hardDays.length; index++) {
-      if (hardDays[index] - hardDays[index - 1] < LIMITS.minDaysBetweenHardDays) {
-        const day = hardDays[index]
-        const week = Math.ceil(day / 7) - 1
-        add(`weeks[${week}]`, `${names.get(muscleId) || muscleId} is worked hard (${LIMITS.hardDaySets}+ weighted sets) on two days in a row ` +
-          `(day ${day - week * 7}); leave a day between`)
-      }
-    }
-  }
-}
-
-const allowedJump = (from, equipment) => Math.max(from * (1 + LIMITS.maxJump), from + equipment.step)
-
-const checkJumps = (topWeights, exercisesById, profile, add) => {
-  for (const [exerciseId, tops] of topWeights) {
-    const exercise = exercisesById.get(exerciseId)
-    const equipment = profile.equipment[exercise.loadedEquipment]
-    const weekIndexes = [...tops.keys()].sort((first, second) => first - second)
-    // From the last session logged into the plan's first week with this exercise
-    let previous = exercise.last && exercise.last.weight
-      ? { amount: convertWeight(exercise.last.weight.amount, exercise.last.weight.unit, equipment.unit), label: 'the last session' }
-      : null
-    weekIndexes.forEach(weekIndex => {
-      const top = tops.get(weekIndex)
-      if (top.unit !== equipment.unit) return // already an error from checkWeight
-      if (previous && top.amount > allowedJump(previous.amount, equipment) + 1e-6) {
-        add(top.path, `${exercise.name} jumps from ${formatAmount(previous.amount)} to ${weightText(top)} after ${previous.label}; ` +
-          `at most ${formatAmount(allowedJump(previous.amount, equipment))} ${equipment.unit}`)
-      }
-      previous = { amount: top.amount, label: `week ${weekIndex + 1}` }
-    })
-  }
-}
-
-const checkGoalReached = (weeks, goal, exercisesById, profile, add) => {
-  if (weeks.length !== goal.weeks) return
-  const exercise = exercisesById.get(goal.exerciseId)
-  if (!exercise) return
-  const lastIndex = weeks.length - 1
-  const items = (weeks[lastIndex].days || []).flatMap(day => day.exercises || []).filter(item => String(item.exerciseId) === goal.exerciseId)
-  const equipment = exercise.loadedEquipment ? profile.equipment[exercise.loadedEquipment] : null
-  const target = equipment ? roundToEquipment(goal.weight, equipment) : null
-  const reached = items.some(item => item.reps >= goal.reps &&
-    (!target || (item.weight && item.weight.unit === target.unit && item.weight.amount >= target.amount - 1e-6)))
-  if (!reached) {
-    add(`weeks[${lastIndex}]`, `the last week must test the goal: ${exercise.name} for ${goal.reps} reps` +
-      (target ? ` at ${weightText(target)} or more` : ''))
-  }
+  const layout = layOut(plan, context)
+  return PLAN_RULES.flatMap(rule => rule(layout, context))
 }
 
 /**
