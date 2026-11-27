@@ -41,6 +41,20 @@ it instead of hitting it). Fewer sets, no heavier than the last build week.</li>
 <p>Phases set the pace: strength climbs faster in a bulk than in a cut. A phase comes from the profile&#39;s calendar;
 a week outside every phase is <code>maintain</code>.</p>
 </dd>
+<dt><a href="#module_planPrompt">planPrompt</a></dt>
+<dd><p>What the model reads: the instructions (the system prompt) and the context, and the message for the fix round.
+The rules in the instructions are written from the same numbers the checks use (LIMITS, PHASE_PACE), so the
+prompt and the checks can&#39;t drift apart. LJS-2, 2026-11-27.</p>
+<p>Caching: the instructions never change and the context is the same in both rounds, so the context block is
+marked for the prompt cache and the fix round reads it from there.</p>
+</dd>
+<dt><a href="#module_planModel">planModel</a></dt>
+<dd><p>The model behind one small interface, so the generator, the tests and later the evals don&#39;t care which model it
+is (Claude now; maybe a cheaper specialised model later, compared by the same evals). LJS-2, 2026-11-27.</p>
+<p>A plan model is <code>{name, propose({system, messages, schema})}</code>; <code>propose</code> resolves to
+<code>{plan, content, usage, model}</code>: the parsed plan (null when the reply isn&#39;t JSON), the reply&#39;s content blocks
+exactly as they came (the fix round sends them back unchanged), the token usage and the model that answered.</p>
+</dd>
 <dt><a href="#module_planFixture">planFixture</a></dt>
 <dd><p>A small gym and history for the plan tests (and later the evals&#39; mocks): rows as the database holds them, a goal,
 and a plan that passes every check, to break one rule at a time.</p>
@@ -66,6 +80,12 @@ lbs with 2.5 lb plates), so every weight is rounded to its equipment&#39;s steps
 <p>A loaded piece of equipment is <code>{unit, min, step, max}</code>: it makes min, min + step, min + 2 x step, ... up to max
 (no max: no limit). A barbell with a 45 lb bar and 2.5 lb plates is min 45, step 5 (one plate a side). Equipment
 with no weight of its own (a bench, a pull-up bar) is <code>{}</code>. LJS-2, 2026-11-26.</p>
+</dd>
+<dt><a href="#module_generatePlan">generatePlan</a></dt>
+<dd><p>The plan generator: the model proposes, code checks. Build the context, check the goal (an unrealistic goal never
+reaches the model), ask for a plan, check it, and when it breaks rules send the exact errors back for one fix
+round. The result says what happened in every round, for the evals and for showing why a plan was refused.
+LJS-2, 2026-11-27.</p>
 </dd>
 <dt><a href="#module_units">units</a></dt>
 <dd><p>Weights in kg or lbs, and timed holds. A workout stores its weight as entered, in the unit the equipment shows
@@ -273,6 +293,7 @@ a week outside every phase is `maintain`.
 * [planSchedule](#module_planSchedule)
     * _static_
         * [.PHASE_PACE](#module_planSchedule.PHASE_PACE)
+        * [.parseDate](#module_planSchedule.parseDate) ⇒ <code>Date</code> \| <code>null</code>
         * [.planStart](#module_planSchedule.planStart) ⇒ <code>Date</code>
         * [.phaseOn](#module_planSchedule.phaseOn) ⇒ <code>string</code>
         * [.buildSchedule](#module_planSchedule.buildSchedule) ⇒ <code>Array.&lt;ScheduleWeek&gt;</code>
@@ -289,18 +310,30 @@ judging a goal), `maxJump` how much a lift's top weight may rise from one week t
 tune from real history (WP-12).
 
 **Kind**: static constant of [<code>planSchedule</code>](#module_planSchedule)  
+<a name="module_planSchedule.parseDate"></a>
+
+### planSchedule.parseDate ⇒ <code>Date</code> \| <code>null</code>
+A 'YYYY-MM-DD' date as local midnight, or null when it isn't a real date.
+
+**Kind**: static constant of [<code>planSchedule</code>](#module_planSchedule)  
+
+| Param | Type |
+| --- | --- |
+| text | <code>string</code> | 
+
 <a name="module_planSchedule.planStart"></a>
 
 ### planSchedule.planStart ⇒ <code>Date</code>
-The first day of a plan: the next Monday after today (a plan made on a Monday starts a week later, so there's
-time to read it).
+The first day of a plan. With a start date (travel, a vacation), the Monday on or after it; without one, the
+next Monday after today (a plan made on a Monday starts a week later, so there's time to read it).
 
 **Kind**: static constant of [<code>planSchedule</code>](#module_planSchedule)  
 **Returns**: <code>Date</code> - local midnight  
 
-| Param | Type |
-| --- | --- |
-| today | <code>Date</code> | 
+| Param | Type | Description |
+| --- | --- | --- |
+| today | <code>Date</code> |  |
+| [startDate] | <code>string</code> | 'YYYY-MM-DD' |
 
 <a name="module_planSchedule.phaseOn"></a>
 
@@ -318,7 +351,7 @@ and both ends count; a phase with no `to` runs on.
 <a name="module_planSchedule.buildSchedule"></a>
 
 ### planSchedule.buildSchedule ⇒ <code>Array.&lt;ScheduleWeek&gt;</code>
-The schedule for a plan of `weeks` weeks starting the Monday after `today`.
+The schedule for a plan of `weeks` weeks, starting on `startDate`'s Monday or the Monday after `today`.
 
 **Kind**: static constant of [<code>planSchedule</code>](#module_planSchedule)  
 
@@ -328,6 +361,7 @@ The schedule for a plan of `weeks` weeks starting the Monday after `today`.
 | options.weeks | <code>number</code> |  |
 | options.profile | <code>GymProfile</code> | reads `deloadEvery` (default 4) and `phases` |
 | options.today | <code>Date</code> |  |
+| [options.startDate] | <code>string</code> | 'YYYY-MM-DD' |
 
 <a name="module_planSchedule.reachableMax"></a>
 
@@ -367,6 +401,126 @@ and two light weeks in a row lose ground). Off when `deloadEvery` is 0, null or 
 | startDate | <code>string</code> | its Monday, 'YYYY-MM-DD' |
 | phase | <code>string</code> | 'cut', 'maintain' or 'bulk' |
 | kind | <code>string</code> | 'build', 'lighter', 'taper' or 'test' |
+
+<a name="module_planPrompt"></a>
+
+## planPrompt
+What the model reads: the instructions (the system prompt) and the context, and the message for the fix round.
+The rules in the instructions are written from the same numbers the checks use (LIMITS, PHASE_PACE), so the
+prompt and the checks can't drift apart. LJS-2, 2026-11-27.
+
+Caching: the instructions never change and the context is the same in both rounds, so the context block is
+marked for the prompt cache and the fix round reads it from there.
+
+
+* [planPrompt](#module_planPrompt)
+    * [.planInstructions](#module_planPrompt.planInstructions) ⇒ <code>string</code>
+    * [.buildPrompt](#module_planPrompt.buildPrompt) ⇒ <code>Object</code>
+    * [.fixMessage](#module_planPrompt.fixMessage) ⇒ <code>Object</code>
+
+<a name="module_planPrompt.planInstructions"></a>
+
+### planPrompt.planInstructions ⇒ <code>string</code>
+The system prompt: the job, then every rule the checks hold the plan to.
+
+**Kind**: static constant of [<code>planPrompt</code>](#module_planPrompt)  
+<a name="module_planPrompt.buildPrompt"></a>
+
+### planPrompt.buildPrompt ⇒ <code>Object</code>
+The first request: the instructions and the context.
+
+**Kind**: static constant of [<code>planPrompt</code>](#module_planPrompt)  
+
+| Param | Type |
+| --- | --- |
+| context | [<code>PlanContext</code>](#PlanContext) | 
+
+<a name="module_planPrompt.fixMessage"></a>
+
+### planPrompt.fixMessage ⇒ <code>Object</code>
+The fix round's message: the exact errors, and the whole plan again.
+
+**Kind**: static constant of [<code>planPrompt</code>](#module_planPrompt)  
+**Returns**: <code>Object</code> - a user message  
+
+| Param | Type |
+| --- | --- |
+| errors | <code>Array.&lt;PlanError&gt;</code> | 
+
+<a name="module_planModel"></a>
+
+## planModel
+The model behind one small interface, so the generator, the tests and later the evals don't care which model it
+is (Claude now; maybe a cheaper specialised model later, compared by the same evals). LJS-2, 2026-11-27.
+
+A plan model is `{name, propose({system, messages, schema})}`; `propose` resolves to
+`{plan, content, usage, model}`: the parsed plan (null when the reply isn't JSON), the reply's content blocks
+exactly as they came (the fix round sends them back unchanged), the token usage and the model that answered.
+
+
+* [planModel](#module_planModel)
+    * _static_
+        * [.PlanModelError](#module_planModel.PlanModelError)
+            * [new exports.PlanModelError(reason, message)](#new_module_planModel.PlanModelError_new)
+        * [.claudePlanModel](#module_planModel.claudePlanModel) ⇒ <code>Object</code>
+        * [.fakePlanModel](#module_planModel.fakePlanModel) ⇒ <code>Object</code>
+    * _inner_
+        * [~parsePlan(text)](#module_planModel..parsePlan) ⇒ <code>Object</code> \| <code>null</code>
+
+<a name="module_planModel.PlanModelError"></a>
+
+### planModel.PlanModelError
+Why a model gave no plan: it declined, ran out of room, or the request failed.
+
+**Kind**: static class of [<code>planModel</code>](#module_planModel)  
+<a name="new_module_planModel.PlanModelError_new"></a>
+
+#### new exports.PlanModelError(reason, message)
+
+| Param | Type | Description |
+| --- | --- | --- |
+| reason | <code>string</code> | 'refusal', 'max_tokens' or 'request' |
+| message | <code>string</code> |  |
+
+<a name="module_planModel.claudePlanModel"></a>
+
+### planModel.claudePlanModel ⇒ <code>Object</code>
+Claude as a plan model: structured output with the plan's schema, streamed (a 12-week plan is long), with the
+server-side fallback turned on so a mistaken safety decline is retried on another model instead of failing.
+Needs credentials in the environment (ANTHROPIC_API_KEY); the SDK is loaded only when a plan is asked for.
+
+**Kind**: static constant of [<code>planModel</code>](#module_planModel)  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| [options] | <code>Object</code> |  |
+| [options.client] | <code>Object</code> | an Anthropic client; injectable for tests |
+| [options.model] | <code>string</code> |  |
+| [options.effort] | <code>string</code> | 'low' to 'max' |
+| [options.maxTokens] | <code>number</code> |  |
+
+<a name="module_planModel.fakePlanModel"></a>
+
+### planModel.fakePlanModel ⇒ <code>Object</code>
+A plan model that replies with the given plans in order, for tests and the evals' mocks. It records every
+request it gets in `requests`.
+
+**Kind**: static constant of [<code>planModel</code>](#module_planModel)  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| replies | <code>Array.&lt;(Object\|string)&gt;</code> | a plan, or a string for a reply that isn't JSON |
+
+<a name="module_planModel..parsePlan"></a>
+
+### planModel~parsePlan(text) ⇒ <code>Object</code> \| <code>null</code>
+The plan from a reply's text, or null when it isn't JSON.
+
+**Kind**: inner method of [<code>planModel</code>](#module_planModel)  
+
+| Param | Type |
+| --- | --- |
+| text | <code>string</code> | 
 
 <a name="module_planFixture"></a>
 
@@ -778,6 +932,53 @@ Whether the equipment can make exactly this weight, in its own unit.
 | avoid | <code>Array.&lt;string&gt;</code> | exercise ids |
 | [deloadEvery] | <code>number</code> \| <code>null</code> | a lighter week every this many weeks (default 4; 0 or null: none) |
 | [phases] | <code>Array.&lt;{phase: string, from: string, to: (string\|undefined)}&gt;</code> | 'cut', 'maintain' or 'bulk' from one date to another ('YYYY-MM-DD', both ends included); a date outside them is maintain |
+
+<a name="module_generatePlan"></a>
+
+## generatePlan
+The plan generator: the model proposes, code checks. Build the context, check the goal (an unrealistic goal never
+reaches the model), ask for a plan, check it, and when it breaks rules send the exact errors back for one fix
+round. The result says what happened in every round, for the evals and for showing why a plan was refused.
+LJS-2, 2026-11-27.
+
+
+* [generatePlan](#module_generatePlan)
+    * _static_
+        * [.generatePlan](#module_generatePlan.generatePlan) ⇒ <code>Promise.&lt;PlanResult&gt;</code>
+    * _inner_
+        * [~PlanResult](#module_generatePlan..PlanResult) : <code>Object</code>
+
+<a name="module_generatePlan.generatePlan"></a>
+
+### generatePlan.generatePlan ⇒ <code>Promise.&lt;PlanResult&gt;</code>
+A plan for one goal.
+
+**Kind**: static constant of [<code>generatePlan</code>](#module_generatePlan)  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| options | <code>Object</code> |  |
+| options.goal | [<code>Goal</code>](#Goal) |  |
+| options.profile | <code>GymProfile</code> |  |
+| options.rows | <code>PlanRows</code> |  |
+| options.model | <code>Object</code> | see planModel.js |
+| [options.today] | <code>Date</code> |  |
+| [options.fixRounds] | <code>number</code> | how many times errors go back to the model (default 1) |
+
+<a name="module_generatePlan..PlanResult"></a>
+
+### generatePlan~PlanResult : <code>Object</code>
+**Kind**: inner typedef of [<code>generatePlan</code>](#module_generatePlan)  
+**Properties**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| status | <code>string</code> | 'ok' (the plan passes every check), 'failed' (still errors after the fix rounds), 'goal-rejected' (the goal can't be planned; no model call) or 'model-error' (the model gave no plan: it declined, ran out of room, or the request failed; the rounds before it are kept) |
+| plan | [<code>Plan</code>](#Plan) \| <code>null</code> | the last plan the model gave |
+| errors | <code>Array.&lt;PlanError&gt;</code> | what's still wrong (none when ok) |
+| rounds | <code>Array.&lt;{plan: (Plan\|null), errors: Array.&lt;PlanError&gt;, usage: Object, model: string}&gt;</code> |  |
+| context | [<code>PlanContext</code>](#PlanContext) |  |
+| [reason] | <code>string</code> | with 'model-error': 'refusal', 'max_tokens' or 'request' |
 
 <a name="module_units"></a>
 
@@ -1571,6 +1772,7 @@ is already more than a day before the local "now" (21:30 in Toronto counted yest
 | weight | <code>Object</code> | the weight to lift |
 | reps | <code>number</code> | for this many reps |
 | weeks | <code>number</code> | 4 to 12 |
+| [startDate] | <code>string</code> | 'YYYY-MM-DD'; the plan starts that week's Monday (the Monday on or after it). Without it, the Monday after today. |
 
 <a name="ContextExercise"></a>
 

@@ -11,7 +11,7 @@
 
 import { convertWeight, formatAmount } from '../data/units.js'
 import { canMake, roundToEquipment } from './gymProfile.js'
-import { PHASE_PACE, reachableMax } from './planSchedule.js'
+import { PHASE_PACE, parseDate, reachableMax } from './planSchedule.js'
 
 export const LIMITS = {
   minWeeks: 4,
@@ -76,6 +76,10 @@ export const checkGoal = (goal, context) => {
   }
   if (!goal.weight || !(goal.weight.amount > 0) || !['kg', 'lbs'].includes(goal.weight.unit)) {
     errors.push(error('goal.weight', 'must be a weight above 0, in kg or lbs'))
+  }
+  if (goal.startDate !== undefined && goal.startDate !== null) {
+    if (!parseDate(goal.startDate)) errors.push(error('goal.startDate', 'must be a date as YYYY-MM-DD'))
+    else if (goal.startDate < context.today) errors.push(error('goal.startDate', `${goal.startDate} is in the past; today is ${context.today}`))
   }
   // Pace is judged only for a well-formed goal on a lift with history to estimate from
   if (errors.length || !exercise.estimatedMax) return errors
