@@ -32,11 +32,19 @@ describe('buildPlanContext', () => {
     expect(exercises.find(exercise => exercise.id === 'pullup')).toMatchObject({ equipment: ['pull_up_bar'], loadedEquipment: null })
   })
 
+  test('an exercise\'s load is its own machine when the profile has one, else its equipment\'s', () => {
+    const machine = { equipment: 'barbell', name: 'bench station', unit: 'lbs', min: 45, step: 10 }
+    const { exercises } = build({ profile: { ...fixtureProfile(), machines: { bench: machine } } })
+    expect(exercises.find(exercise => exercise.id === 'bench')).toMatchObject({ loadedEquipment: 'barbell', load: { name: 'bench station', step: 10 } })
+    expect(exercises.find(exercise => exercise.id === 'squat').load).toEqual({ unit: 'lbs', min: 45, step: 5 })
+    expect(exercises.find(exercise => exercise.id === 'pullup').load).toBeNull()
+  })
+
   test('lists muscles by share, regions under their muscle\'s name', () => {
     const bench = build().exercises.find(exercise => exercise.id === 'bench')
     expect(bench.muscles).toEqual([
-      { muscleId: '15', name: 'Pectorals: Mid and lower chest', share: 100 },
-      { muscleId: '14', name: 'Triceps', share: 50 }
+      { muscleId: '15', groupId: '11', name: 'Pectorals: Mid and lower chest', share: 100 },
+      { muscleId: '14', groupId: '14', name: 'Triceps', share: 50 }
     ])
   })
 

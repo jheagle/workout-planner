@@ -9,7 +9,7 @@
 import { convertWeight, workoutWeight } from '../data/units.js'
 import { localDate } from '../data/localDate.js'
 import { musclePriority } from '../data/musclePriority.js'
-import { isLoaded } from './gymProfile.js'
+import { loadFor } from './gymProfile.js'
 import { buildSchedule } from './planSchedule.js'
 
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000
@@ -79,6 +79,11 @@ export const buildPlanContext = ({ goal, profile, rows, today = new Date() }) =>
     const parent = muscle.parent_id ? musclesById.get(String(muscle.parent_id)) : null
     return parent ? `${parent.name}: ${muscle.name}` : muscle.name
   }
+  // A muscle's group is its parent (Pectorals for upper chest), or itself when it has none
+  const muscleGroup = id => {
+    const muscle = musclesById.get(id)
+    return muscle && muscle.parent_id ? String(muscle.parent_id) : id
+  }
   const linksByExercise = groupBy(rows.exerciseMuscle, 'exercise_id')
   const equipmentByExercise = groupBy(rows.exerciseEquipment, 'exercise_id')
   const workoutsByExercise = groupBy(rows.workouts.filter(workout => workout.date <= todayText), 'exercise_id')
@@ -96,13 +101,18 @@ export const buildPlanContext = ({ goal, profile, rows, today = new Date() }) =>
         .map(workout => ({ weight: workoutWeight(workout), reps: workout.reps }))
         .filter(({ weight, reps }) => weight && reps)
         .map(({ weight, reps }) => estimateMax(convertWeight(weight.amount, weight.unit, profile.unit), reps))
+      const loaded = loadFor(profile, id, equipment)
       return {
         id,
         name: row.name,
         equipment,
-        loadedEquipment: equipment.find(equipmentId => isLoaded(profile.equipment[equipmentId])) ?? null,
+        loadedEquipment: loaded ? loaded.equipmentId : null,
+        load: loaded ? loaded.load : null,
         muscles: (linksByExercise.get(id) || [])
-          .map(link => ({ muscleId: String(link.muscle_id), name: muscleName(String(link.muscle_id)), share: link.muscle_rank ?? 100 }))
+          .map(link => {
+            const muscleId = String(link.muscle_id)
+            return { muscleId, groupId: muscleGroup(muscleId), name: muscleName(muscleId), share: link.muscle_rank ?? 100 }
+          })
           .sort((first, second) => second.share - first.share),
         last: last
           ? { date: last.date, sets: last.sets ?? null, reps: last.reps ?? null, weight: lastWeight }
@@ -147,7 +157,10 @@ export const buildPlanContext = ({ goal, profile, rows, today = new Date() }) =>
  * @property {string} name
  * @property {string[]} equipment - equipment ids it needs, all in the gym
  * @property {(string|null)} loadedEquipment - the one that takes the weight, or null
- * @property {Array<{muscleId: string, name: string, share: number}>} muscles - share of the work, 0-100
+ * @property {(Equipment|null)} load - the weights it can be set to: its own machine's (gymProfile machines) or its
+ * equipment's; null for a bodyweight exercise
+ * @property {Array<{muscleId: string, groupId: string, name: string, share: number}>} muscles - share of the work,
+ * 0-100; groupId is the muscle's group (its parent, or itself)
  * @property {({date: string, sets: (number|null), reps: (number|null), weight: ({amount: number, unit: string}|null)}|null)} last
  * @property {({amount: number, unit: string}|null)} estimatedMax - in the profile's unit
  */

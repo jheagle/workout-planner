@@ -9,6 +9,9 @@ describe('planInstructions', () => {
     expect(text).toContain('5% in a cut week')
     expect(text).toContain('at most 60% of the sets')
     expect(text).toContain('at most 70% of the sets')
+    expect(text).toContain('load.min + a whole number of load.step')
+    expect(text).toContain('run: groups 3, 7, 8, 12')
+    expect(text).toContain('profile.firstExercise')
   })
 })
 

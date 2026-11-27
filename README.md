@@ -612,6 +612,7 @@ and list it there. The limits are starting points, kept in `LIMITS` to tune from
 
 * [planChecks](#module_planChecks)
     * _static_
+        * [.ACTIVITY_MUSCLE_GROUPS](#module_planChecks.ACTIVITY_MUSCLE_GROUPS)
         * [.checkGoal](#module_planChecks.checkGoal) ⇒ <code>Array.&lt;PlanError&gt;</code>
         * [.PLAN_RULES](#module_planChecks.PLAN_RULES)
         * [.checkPlan](#module_planChecks.checkPlan) ⇒ <code>Array.&lt;PlanError&gt;</code>
@@ -619,6 +620,7 @@ and list it there. The limits are starting points, kept in `LIMITS` to tune from
     * _inner_
         * [~layOut(plan, context)](#module_planChecks..layOut) ⇒ <code>PlanLayout</code>
         * [~weightedSetsByMuscleAndDay()](#module_planChecks..weightedSetsByMuscleAndDay) ⇒ <code>Map.&lt;string, Map.&lt;number, number&gt;&gt;</code>
+        * [~weightedSetsByGroupAndDay()](#module_planChecks..weightedSetsByGroupAndDay) ⇒ <code>Map.&lt;string, Map.&lt;number, number&gt;&gt;</code>
         * [~setsByWeek()](#module_planChecks..setsByWeek)
         * [~topWeights()](#module_planChecks..topWeights)
         * [~buildWeekBefore()](#module_planChecks..buildWeekBefore)
@@ -634,12 +636,23 @@ and list it there. The limits are starting points, kept in `LIMITS` to tune from
         * [~mustIncludesEveryWeek()](#module_planChecks..mustIncludesEveryWeek)
         * [~weeklySetsPerMuscle()](#module_planChecks..weeklySetsPerMuscle)
         * [~restBetweenHardDays()](#module_planChecks..restBetweenHardDays)
+        * [~daysAreTrainingDays()](#module_planChecks..daysAreTrainingDays)
+        * [~sessionsStartRight()](#module_planChecks..sessionsStartRight)
+        * [~musclesWorkedEnoughDays()](#module_planChecks..musclesWorkedEnoughDays)
+        * [~otherTrainingRested()](#module_planChecks..otherTrainingRested)
         * [~weightsRiseGradually()](#module_planChecks..weightsRiseGradually)
         * [~lighterWeeksAreLighter()](#module_planChecks..lighterWeeksAreLighter)
         * [~lastWeekTestsGoal()](#module_planChecks..lastWeekTestsGoal)
         * [~PlanError](#module_planChecks..PlanError) : <code>Object</code>
         * [~PlanLayout](#module_planChecks..PlanLayout) : <code>Object</code>
 
+<a name="module_planChecks.ACTIVITY_MUSCLE_GROUPS"></a>
+
+### planChecks.ACTIVITY\_MUSCLE\_GROUPS
+The muscle groups (database/muscles ids) each kind of other training uses: on its day and the day before, none is
+worked hard, so a run starts on recovered legs. Calves, glutes, hamstrings and quadriceps.
+
+**Kind**: static constant of [<code>planChecks</code>](#module_planChecks)  
 <a name="module_planChecks.checkGoal"></a>
 
 ### planChecks.checkGoal ⇒ <code>Array.&lt;PlanError&gt;</code>
@@ -703,6 +716,13 @@ triceps is 1.5 for triceps).
 
 **Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
 **Returns**: <code>Map.&lt;string, Map.&lt;number, number&gt;&gt;</code> - muscleId -> dayNumber -> weighted sets  
+<a name="module_planChecks..weightedSetsByGroupAndDay"></a>
+
+### planChecks~weightedSetsByGroupAndDay() ⇒ <code>Map.&lt;string, Map.&lt;number, number&gt;&gt;</code>
+Weighted sets per muscle group per day (a group's muscles added up: upper and lower chest are Pectorals).
+
+**Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
+**Returns**: <code>Map.&lt;string, Map.&lt;number, number&gt;&gt;</code> - groupId -> dayNumber -> weighted sets  
 <a name="module_planChecks..setsByWeek"></a>
 
 ### planChecks~setsByWeek()
@@ -760,7 +780,7 @@ Every exercise is one from the context (which already leaves out the no-gos), an
 <a name="module_planChecks..setsAndRepsInRange"></a>
 
 ### planChecks~setsAndRepsInRange()
-Sets and reps are whole numbers in range.
+Sets and reps are whole numbers in range; the profile can narrow the sets (setsPerExercise).
 
 **Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
 <a name="module_planChecks..weightsFitEquipment"></a>
@@ -792,6 +812,32 @@ No muscle gets more than the weekly limit of weighted sets in any week.
 
 ### planChecks~restBetweenHardDays()
 A muscle worked hard one day gets the next day off from hard work (also from a Sunday into the next Monday).
+
+**Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
+<a name="module_planChecks..daysAreTrainingDays"></a>
+
+### planChecks~daysAreTrainingDays()
+When the profile names its training days, every day is one of them.
+
+**Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
+<a name="module_planChecks..sessionsStartRight"></a>
+
+### planChecks~sessionsStartRight()
+When the profile names a first exercise, every session starts with it.
+
+**Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
+<a name="module_planChecks..musclesWorkedEnoughDays"></a>
+
+### planChecks~musclesWorkedEnoughDays()
+When the profile asks for it, every muscle group the gym's exercises work gets at least one weighted set on that
+many days of each week (the test week is left out: it's for the test).
+
+**Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
+<a name="module_planChecks..otherTrainingRested"></a>
+
+### planChecks~otherTrainingRested()
+Other training (a run on Wednesday) starts recovered: the muscle groups it uses aren't worked hard that day or the
+day before.
 
 **Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
 <a name="module_planChecks..weightsRiseGradually"></a>
@@ -852,21 +898,45 @@ with no weight of its own (a bench, a pull-up bar) is `{}`. LJS-2, 2026-11-26.
 
 * [gymProfile](#module_gymProfile)
     * _static_
-        * [.placeholderProfile](#module_gymProfile.placeholderProfile) : <code>GymProfile</code>
+        * [.joshuaProfile](#module_gymProfile.joshuaProfile) : <code>GymProfile</code>
+        * [.loadFor](#module_gymProfile.loadFor) ⇒ <code>Object</code> \| <code>null</code>
         * [.isLoaded](#module_gymProfile.isLoaded) ⇒ <code>boolean</code>
         * [.roundToEquipment](#module_gymProfile.roundToEquipment) ⇒ <code>Object</code>
         * [.canMake](#module_gymProfile.canMake) ⇒ <code>boolean</code>
     * _inner_
         * [~Equipment](#module_gymProfile..Equipment) : <code>Object</code>
+        * [~Machine](#module_gymProfile..Machine) : <code>Object</code>
         * [~GymProfile](#module_gymProfile..GymProfile) : <code>Object</code>
 
-<a name="module_gymProfile.placeholderProfile"></a>
+<a name="module_gymProfile.joshuaProfile"></a>
 
-### gymProfile.placeholderProfile : <code>GymProfile</code>
-PLACEHOLDER values, not Joshua's gym yet: his list (equipment steps, days, session length, must-haves and
-no-gos, the v1 goal) replaces these. The equipment ids are the ones in database/equipment.
+### gymProfile.joshuaProfile : <code>GymProfile</code>
+Joshua's gym and week, from his notes on 2026-11-27 (the full list, with what's still unknown, is in tm:
+WP/equipment). The equipment ids are the ones in database/equipment.
+
+- Weights are pin-only: a stack's add-on (a 5 lb dial or slider) is a real option on the day, but plans don't
+  rely on it ("the full pin step feels like a real weight"). Add-ons are listed in `addOns` for later.
+- The barbell steps by 10: 5 lb plates (one a side) are the smallest the gym reliably has.
+- Machines differ, so the ones he uses have their own entry in `machines` (by exercise id); the rest use the
+  general `machine` and `cable_machine` values, which are guesses.
+- No weighted chin-ups (the cause of his brachialis injury): pull-up bar exercises take no weight in a plan.
 
 **Kind**: static constant of [<code>gymProfile</code>](#module_gymProfile)  
+<a name="module_gymProfile.loadFor"></a>
+
+### gymProfile.loadFor ⇒ <code>Object</code> \| <code>null</code>
+What takes the weight in an exercise, and the weights it makes: its own machine when the profile has one,
+otherwise the first of its equipment that takes a weight. Null for a bodyweight exercise.
+
+**Kind**: static constant of [<code>gymProfile</code>](#module_gymProfile)  
+**Returns**: <code>Object</code> \| <code>null</code> - load has `name` too for a machine  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| profile | <code>GymProfile</code> |  |
+| exerciseId | <code>string</code> |  |
+| equipmentIds | <code>Array.&lt;string&gt;</code> | the equipment the exercise needs |
+
 <a name="module_gymProfile.isLoaded"></a>
 
 ### gymProfile.isLoaded ⇒ <code>boolean</code>
@@ -915,6 +985,23 @@ Whether the equipment can make exactly this weight, in its own unit.
 | [min] | <code>number</code> | the lightest weight it makes |
 | [step] | <code>number</code> | the smallest change in weight |
 | [max] | <code>number</code> | the heaviest weight it makes (none: no limit) |
+| [addOns] | <code>Array.&lt;number&gt;</code> | small weights that go on top (a 5 lb dial); listed, not used by plans yet |
+
+<a name="module_gymProfile..Machine"></a>
+
+### gymProfile~Machine : <code>Object</code>
+**Kind**: inner typedef of [<code>gymProfile</code>](#module_gymProfile)  
+**Properties**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| equipment | <code>string</code> | the equipment id it counts as (machine, cable_machine) |
+| name | <code>string</code> | what it is, for people and the model |
+| unit | <code>string</code> |  |
+| min | <code>number</code> |  |
+| step | <code>number</code> |  |
+| [max] | <code>number</code> |  |
+| [addOns] | <code>Array.&lt;number&gt;</code> |  |
 
 <a name="module_gymProfile..GymProfile"></a>
 
@@ -926,7 +1013,14 @@ Whether the equipment can make exactly this weight, in its own unit.
 | --- | --- | --- |
 | unit | <code>string</code> | the unit plans are shown in |
 | daysPerWeek | <code>number</code> | most training days in a week |
+| [trainingDays] | <code>Array.&lt;number&gt;</code> | the only weekdays to train on (1 Monday to 7 Sunday); any day when absent |
 | sessionMinutes | <code>number</code> | longest session |
+| [style] | <code>string</code> | how the person trains, in plain words, for the model |
+| [setsPerExercise] | <code>Object</code> | sets an exercise may have (the general limits when absent) |
+| [minDaysPerMuscle] | <code>number</code> | days a week every muscle group is worked (a lighter or taper week too; not the test week) |
+| [firstExercise] | <code>string</code> | an exercise id every session starts with |
+| [otherTraining] | <code>Array.&lt;{dayOfWeek: number, activity: string}&gt;</code> | other training on fixed weekdays (a 'run'); the muscles it uses aren't worked hard on that day or the day before |
+| [machines] | <code>Object.&lt;string, Machine&gt;</code> | by exercise id: the weights that exercise's machine makes, when it differs from its equipment's general values |
 | bodyweight | <code>Object</code> \| <code>null</code> |  |
 | equipment | <code>Object.&lt;string, Equipment&gt;</code> | by equipment id; missing means the gym doesn't have it |
 | mustInclude | <code>Array.&lt;string&gt;</code> | exercise ids |
@@ -1787,7 +1881,8 @@ is already more than a day before the local "now" (21:30 in Toronto counted yest
 | name | <code>string</code> |  |
 | equipment | <code>Array.&lt;string&gt;</code> | equipment ids it needs, all in the gym |
 | loadedEquipment | <code>string</code> \| <code>null</code> | the one that takes the weight, or null |
-| muscles | <code>Array.&lt;{muscleId: string, name: string, share: number}&gt;</code> | share of the work, 0-100 |
+| load | <code>Equipment</code> \| <code>null</code> | the weights it can be set to: its own machine's (gymProfile machines) or its equipment's; null for a bodyweight exercise |
+| muscles | <code>Array.&lt;{muscleId: string, groupId: string, name: string, share: number}&gt;</code> | share of the work, 0-100; groupId is the muscle's group (its parent, or itself) |
 | last | <code>Object</code> \| <code>null</code> |  |
 | estimatedMax | <code>Object</code> \| <code>null</code> | in the profile's unit |
 

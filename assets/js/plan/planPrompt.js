@@ -8,7 +8,7 @@
  * @module planPrompt
  */
 
-import { formatErrors, LIMITS } from './planChecks.js'
+import { ACTIVITY_MUSCLE_GROUPS, formatErrors, LIMITS } from './planChecks.js'
 import { PHASE_PACE } from './planSchedule.js'
 
 const percent = share => `${Math.round(share * 1000) / 10}%`
@@ -24,16 +24,21 @@ export const planInstructions = () => [
   'and the muscles that need more work now (needsPriority). Use only what is in it.',
   '',
   'Rules (code checks every one; a plan that breaks any is sent back):',
-  '- One entry in weeks per week of the goal, numbered from 1. At most profile.daysPerWeek training days a week, each on its own dayOfWeek (1 Monday to 7 Sunday).',
-  '- exerciseId is an id from context.exercises. Never an exercise on profile.avoid; every exercise on profile.mustInclude in every week.',
-  `- sets from ${LIMITS.minSets} to ${LIMITS.maxSets}, reps from ${LIMITS.minReps} to ${LIMITS.maxReps}, whole numbers.`,
-  '- An exercise with a loadedEquipment names it as equipmentId and has a weight that equipment can make: in its unit, ' +
-  'min + a whole number of steps, never above max (profile.equipment). An exercise without one has equipmentId null and weight null.',
+  '- One entry in weeks per week of the goal, numbered from 1. At most profile.daysPerWeek training days a week, each on its own dayOfWeek (1 Monday to 7 Sunday); ' +
+  'when profile.trainingDays is set, only on those days.',
+  '- exerciseId is an id from context.exercises. Never an exercise on profile.avoid; every exercise on profile.mustInclude in every week. ' +
+  'When profile.firstExercise is set, every session starts with it.',
+  `- sets from ${LIMITS.minSets} to ${LIMITS.maxSets} (or profile.setsPerExercise.min to max, when set), reps from ${LIMITS.minReps} to ${LIMITS.maxReps}, whole numbers.`,
+  '- An exercise with a loadedEquipment names it as equipmentId and has a weight its load can make: in load.unit, ' +
+  'load.min + a whole number of load.step, never above load.max (load.addOns are not used). An exercise without one has equipmentId null and weight null.',
   `- A session fits profile.sessionMinutes: ${LIMITS.warmUpMinutes} minutes of warm-up plus ${LIMITS.minutesPerSet} minutes per set.`,
   `- Weighted sets per muscle (sets x the muscle's share / 100) are at most ${LIMITS.maxWeeklySets} a week. ` +
   `A muscle with ${LIMITS.hardDaySets} or more weighted sets in a day is worked hard; never hard on two days in a row (Sunday to Monday counts).`,
+  `- When profile.minDaysPerMuscle is set, every muscle group (exercises[].muscles[].groupId) gets ${LIMITS.workedDaySets}+ weighted set on that many days of each week, except the test week.`,
+  '- profile.otherTraining is other training on fixed weekdays. On its day and the day before, the muscle groups it uses get fewer than ' +
+  `${LIMITS.hardDaySets} weighted sets each (${Object.entries(ACTIVITY_MUSCLE_GROUPS).map(([activity, groups]) => `${activity}: groups ${groups.join(', ')}`).join('; ')}).`,
   '- Each lift starts from its last session. Its top weight rises at most this much from one week to the next ' +
-  `(or one step of its equipment, when that is more): ${Object.entries(PHASE_PACE).map(([phase, { maxJump }]) => `${percent(maxJump)} in a ${phase} week`).join(', ')}. ` +
+  `(or one step of its load, when that is more): ${Object.entries(PHASE_PACE).map(([phase, { maxJump }]) => `${percent(maxJump)} in a ${phase} week`).join(', ')}. ` +
   'Dropping is always fine.',
   '- Follow schedule[].kind for each week:',
   '  - build: normal training; the weights climb.',
@@ -42,7 +47,7 @@ export const planInstructions = () => [
   `  - taper: at most ${percent(LIMITS.taperSetsShare)} of the sets of the build week before it.`,
   '  - test: the goal lift for the goal\'s reps, at the goal weight (rounded to its equipment) or more.',
   '',
-  'Aim: reach the goal safely, and give the muscles marked needsPriority a bit more of the weekly work. Keep the plan simple ' +
+  'Aim: reach the goal safely, train the way profile.style describes, and give the muscles marked needsPriority a bit more of the weekly work. Keep the plan simple ' +
   'enough to follow: the same few exercises on the same days from week to week, changing sets, reps and weights.',
   'The summary is two or three plain sentences: the approach and how the weights progress.'
 ].join('\n')
