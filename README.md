@@ -18,6 +18,39 @@ equipment shows (`weight` and `unit`, kg or lbs), and the page shows them in the
 ## Modules
 
 <dl>
+<dt><a href="#module_planSchema">planSchema</a></dt>
+<dd><p>The shape of a plan: what the model must return (as a JSON schema, for structured outputs) and what the checks
+read. The schema holds only the shape (types, required fields, no extra fields); ranges and rules (sets, reps,
+weights the equipment can make, weekly volume) are the checks&#39; job (planChecks.js), so their errors can name the
+exact field and the model can fix it.</p>
+<p>A plan is weeks of training days. A day is placed by <code>dayOfWeek</code> (1 Monday to 7 Sunday), so the checks can see
+rest between days; saving a plan turns these into future-dated workouts from its start date. LJS-2, 2026-11-26.</p>
+</dd>
+<dt><a href="#module_planFixture">planFixture</a></dt>
+<dd><p>A small gym and history for the plan tests (and later the evals&#39; mocks): rows as the database holds them, a goal,
+and a plan that passes every check, to break one rule at a time.</p>
+</dd>
+<dt><a href="#module_planContext">planContext</a></dt>
+<dd><p>What a plan is built from, gathered by code (never by the model): the exercises this gym&#39;s equipment allows, each
+with the muscles it works, its last session and an estimated one-rep max, plus the goal, the gym profile and the
+muscles that need attention now. The same context goes to the model and to the checks. LJS-2, 2026-11-26.</p>
+</dd>
+<dt><a href="#module_planChecks">planChecks</a></dt>
+<dd><p>The code that checks a plan: the model proposes, these decide. Every error names the exact field
+(<code>weeks[1].days[0].exercises[2].weight</code>) and what&#39;s wrong with it, so one fix round can hand the model the list,
+and the evals grade plans by the same checks. LJS-2, 2026-11-26.</p>
+<p>How it reads: <code>checkPlan</code> lays the plan out flat once (every day and every exercise with its path), then runs
+the rules in <code>PLAN_RULES</code>, one small function per rule, and collects their errors. To add a rule, write a function
+and list it there. The limits are starting points, kept in <code>LIMITS</code> to tune from real plans.</p>
+</dd>
+<dt><a href="#module_gymProfile">gymProfile</a></dt>
+<dd><p>The gym a plan is built for: which equipment there is, the weights each piece can actually be set to, and the
+days and time there are to train. A plan&#39;s weights must be ones the equipment can make (a barbell can&#39;t hold 137
+lbs with 2.5 lb plates), so every weight is rounded to its equipment&#39;s steps.</p>
+<p>A loaded piece of equipment is <code>{unit, min, step, max}</code>: it makes min, min + step, min + 2 x step, ... up to max
+(no max: no limit). A barbell with a 45 lb bar and 2.5 lb plates is min 45, step 5 (one plate a side). Equipment
+with no weight of its own (a bench, a pull-up bar) is <code>{}</code>. LJS-2, 2026-11-26.</p>
+</dd>
 <dt><a href="#module_units">units</a></dt>
 <dd><p>Weights in kg or lbs, and timed holds. A workout stores its weight as entered, in the unit the equipment shows
 (<code>weight</code> as decimal text, since json-fs-query has no decimal type, and <code>unit</code>), and every weight is shown in the
@@ -170,6 +203,416 @@ workout&#39;s date has no time of day, and new Date(&#39;YYYY-MM-DD&#39;) is mid
 is already more than a day before the local &quot;now&quot; (21:30 in Toronto counted yesterday&#39;s workout as 2 days ago).</p>
 </dd>
 </dl>
+
+## Typedefs
+
+<dl>
+<dt><a href="#PlanExercise">PlanExercise</a> : <code>Object</code></dt>
+<dd></dd>
+<dt><a href="#Plan">Plan</a> : <code>Object</code></dt>
+<dd></dd>
+<dt><a href="#Goal">Goal</a> : <code>Object</code></dt>
+<dd></dd>
+<dt><a href="#ContextExercise">ContextExercise</a> : <code>Object</code></dt>
+<dd></dd>
+<dt><a href="#PlanContext">PlanContext</a> : <code>Object</code></dt>
+<dd></dd>
+</dl>
+
+<a name="module_planSchema"></a>
+
+## planSchema
+The shape of a plan: what the model must return (as a JSON schema, for structured outputs) and what the checks
+read. The schema holds only the shape (types, required fields, no extra fields); ranges and rules (sets, reps,
+weights the equipment can make, weekly volume) are the checks' job (planChecks.js), so their errors can name the
+exact field and the model can fix it.
+
+A plan is weeks of training days. A day is placed by `dayOfWeek` (1 Monday to 7 Sunday), so the checks can see
+rest between days; saving a plan turns these into future-dated workouts from its start date. LJS-2, 2026-11-26.
+
+<a name="module_planSchema.planSchema"></a>
+
+### planSchema.planSchema
+The JSON schema of a plan, for the model's structured output.
+
+**Kind**: static constant of [<code>planSchema</code>](#module_planSchema)  
+<a name="module_planFixture"></a>
+
+## planFixture
+A small gym and history for the plan tests (and later the evals' mocks): rows as the database holds them, a goal,
+and a plan that passes every check, to break one rule at a time.
+
+<a name="module_planContext"></a>
+
+## planContext
+What a plan is built from, gathered by code (never by the model): the exercises this gym's equipment allows, each
+with the muscles it works, its last session and an estimated one-rep max, plus the goal, the gym profile and the
+muscles that need attention now. The same context goes to the model and to the checks. LJS-2, 2026-11-26.
+
+
+* [planContext](#module_planContext)
+    * _static_
+        * [.estimateMax](#module_planContext.estimateMax) ⇒ <code>number</code>
+        * [.readPlanRows](#module_planContext.readPlanRows) ⇒ <code>Promise.&lt;PlanRows&gt;</code>
+        * [.buildPlanContext](#module_planContext.buildPlanContext) ⇒ [<code>PlanContext</code>](#PlanContext)
+    * _inner_
+        * [~PlanRows](#module_planContext..PlanRows) : <code>Object</code>
+
+<a name="module_planContext.estimateMax"></a>
+
+### planContext.estimateMax ⇒ <code>number</code>
+A one-rep max estimated from a set (Epley): weight x (1 + reps / 30); one rep is the weight itself.
+
+**Kind**: static constant of [<code>planContext</code>](#module_planContext)  
+
+| Param | Type |
+| --- | --- |
+| amount | <code>number</code> | 
+| reps | <code>number</code> | 
+
+<a name="module_planContext.readPlanRows"></a>
+
+### planContext.readPlanRows ⇒ <code>Promise.&lt;PlanRows&gt;</code>
+Every row a plan's context needs, read whole (joined in code, as reads.js does).
+
+**Kind**: static constant of [<code>planContext</code>](#module_planContext)  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| query | <code>function</code> | json-fs-query's |
+
+<a name="module_planContext.buildPlanContext"></a>
+
+### planContext.buildPlanContext ⇒ [<code>PlanContext</code>](#PlanContext)
+The context for one plan.
+
+**Kind**: static constant of [<code>planContext</code>](#module_planContext)  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| options | <code>Object</code> |  |
+| options.goal | [<code>Goal</code>](#Goal) |  |
+| options.profile | <code>GymProfile</code> |  |
+| options.rows | <code>PlanRows</code> |  |
+| [options.today] | <code>Date</code> | injectable for testing; only its local date counts |
+
+<a name="module_planContext..PlanRows"></a>
+
+### planContext~PlanRows : <code>Object</code>
+**Kind**: inner typedef of [<code>planContext</code>](#module_planContext)  
+**Properties**
+
+| Name | Type |
+| --- | --- |
+| muscles | <code>Array.&lt;Object&gt;</code> | 
+| exercises | <code>Array.&lt;Object&gt;</code> | 
+| exerciseMuscle | <code>Array.&lt;Object&gt;</code> | 
+| exerciseEquipment | <code>Array.&lt;Object&gt;</code> | 
+| workouts | <code>Array.&lt;Object&gt;</code> | 
+
+<a name="module_planChecks"></a>
+
+## planChecks
+The code that checks a plan: the model proposes, these decide. Every error names the exact field
+(`weeks[1].days[0].exercises[2].weight`) and what's wrong with it, so one fix round can hand the model the list,
+and the evals grade plans by the same checks. LJS-2, 2026-11-26.
+
+How it reads: `checkPlan` lays the plan out flat once (every day and every exercise with its path), then runs
+the rules in `PLAN_RULES`, one small function per rule, and collects their errors. To add a rule, write a function
+and list it there. The limits are starting points, kept in `LIMITS` to tune from real plans.
+
+
+* [planChecks](#module_planChecks)
+    * _static_
+        * [.checkGoal](#module_planChecks.checkGoal) ⇒ <code>Array.&lt;PlanError&gt;</code>
+        * [.PLAN_RULES](#module_planChecks.PLAN_RULES)
+        * [.checkPlan](#module_planChecks.checkPlan) ⇒ <code>Array.&lt;PlanError&gt;</code>
+        * [.formatErrors](#module_planChecks.formatErrors) ⇒ <code>string</code>
+    * _inner_
+        * [~layOut(plan, context)](#module_planChecks..layOut) ⇒ <code>PlanLayout</code>
+        * [~weightedSetsByMuscleAndDay()](#module_planChecks..weightedSetsByMuscleAndDay) ⇒ <code>Map.&lt;string, Map.&lt;number, number&gt;&gt;</code>
+        * [~weeksMatchGoal()](#module_planChecks..weeksMatchGoal)
+        * [~weeksAreNumbered()](#module_planChecks..weeksAreNumbered)
+        * [~daysFitTheWeek()](#module_planChecks..daysFitTheWeek)
+        * [~weekdaysAreValid()](#module_planChecks..weekdaysAreValid)
+        * [~daysHaveExercises()](#module_planChecks..daysHaveExercises)
+        * [~exercisesAreKnown()](#module_planChecks..exercisesAreKnown)
+        * [~setsAndRepsInRange()](#module_planChecks..setsAndRepsInRange)
+        * [~weightsFitEquipment()](#module_planChecks..weightsFitEquipment)
+        * [~sessionsFitTheTime()](#module_planChecks..sessionsFitTheTime)
+        * [~mustIncludesEveryWeek()](#module_planChecks..mustIncludesEveryWeek)
+        * [~weeklySetsPerMuscle()](#module_planChecks..weeklySetsPerMuscle)
+        * [~restBetweenHardDays()](#module_planChecks..restBetweenHardDays)
+        * [~weightsRiseGradually()](#module_planChecks..weightsRiseGradually)
+        * [~lastWeekTestsGoal()](#module_planChecks..lastWeekTestsGoal)
+        * [~PlanError](#module_planChecks..PlanError) : <code>Object</code>
+        * [~PlanLayout](#module_planChecks..PlanLayout) : <code>Object</code>
+
+<a name="module_planChecks.checkGoal"></a>
+
+### planChecks.checkGoal ⇒ <code>Array.&lt;PlanError&gt;</code>
+Whether a goal can be planned for: its exercise is one this gym allows, and it's a strength goal v1 handles in a
+realistic time.
+
+**Kind**: static constant of [<code>planChecks</code>](#module_planChecks)  
+
+| Param | Type |
+| --- | --- |
+| goal | [<code>Goal</code>](#Goal) | 
+| context | [<code>PlanContext</code>](#PlanContext) | 
+
+<a name="module_planChecks.PLAN_RULES"></a>
+
+### planChecks.PLAN\_RULES
+Every rule a plan must pass, in the order their errors are listed: the plan's shape, then each exercise, then
+each session and week, then progress over the weeks.
+
+**Kind**: static constant of [<code>planChecks</code>](#module_planChecks)  
+<a name="module_planChecks.checkPlan"></a>
+
+### planChecks.checkPlan ⇒ <code>Array.&lt;PlanError&gt;</code>
+Every problem with a plan, or none.
+
+**Kind**: static constant of [<code>planChecks</code>](#module_planChecks)  
+
+| Param | Type |
+| --- | --- |
+| plan | [<code>Plan</code>](#Plan) | 
+| context | [<code>PlanContext</code>](#PlanContext) | 
+
+<a name="module_planChecks.formatErrors"></a>
+
+### planChecks.formatErrors ⇒ <code>string</code>
+Errors as the list handed back to the model in the fix round: one line each, the field first.
+
+**Kind**: static constant of [<code>planChecks</code>](#module_planChecks)  
+
+| Param | Type |
+| --- | --- |
+| errors | <code>Array.&lt;PlanError&gt;</code> | 
+
+<a name="module_planChecks..layOut"></a>
+
+### planChecks~layOut(plan, context) ⇒ <code>PlanLayout</code>
+The plan as flat lists, each entry with its path, so every rule is a simple loop.
+
+**Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
+
+| Param | Type |
+| --- | --- |
+| plan | [<code>Plan</code>](#Plan) | 
+| context | [<code>PlanContext</code>](#PlanContext) | 
+
+<a name="module_planChecks..weightedSetsByMuscleAndDay"></a>
+
+### planChecks~weightedSetsByMuscleAndDay() ⇒ <code>Map.&lt;string, Map.&lt;number, number&gt;&gt;</code>
+Weighted sets per muscle per day: each exercise's sets times the muscle's share of it (3 sets of bench at 50%
+triceps is 1.5 for triceps).
+
+**Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
+**Returns**: <code>Map.&lt;string, Map.&lt;number, number&gt;&gt;</code> - muscleId -> dayNumber -> weighted sets  
+<a name="module_planChecks..weeksMatchGoal"></a>
+
+### planChecks~weeksMatchGoal()
+The plan has as many weeks as the goal.
+
+**Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
+<a name="module_planChecks..weeksAreNumbered"></a>
+
+### planChecks~weeksAreNumbered()
+Weeks are numbered 1, 2, 3, ... in order.
+
+**Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
+<a name="module_planChecks..daysFitTheWeek"></a>
+
+### planChecks~daysFitTheWeek()
+No week has more training days than the profile allows.
+
+**Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
+<a name="module_planChecks..weekdaysAreValid"></a>
+
+### planChecks~weekdaysAreValid()
+Each day is a weekday from 1 (Monday) to 7 (Sunday), once per week.
+
+**Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
+<a name="module_planChecks..daysHaveExercises"></a>
+
+### planChecks~daysHaveExercises()
+Every training day has at least one exercise.
+
+**Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
+<a name="module_planChecks..exercisesAreKnown"></a>
+
+### planChecks~exercisesAreKnown()
+Every exercise is one from the context (which already leaves out the no-gos), and not on the no-go list.
+
+**Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
+<a name="module_planChecks..setsAndRepsInRange"></a>
+
+### planChecks~setsAndRepsInRange()
+Sets and reps are whole numbers in range.
+
+**Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
+<a name="module_planChecks..weightsFitEquipment"></a>
+
+### planChecks~weightsFitEquipment()
+A loaded exercise names its equipment and has a weight that equipment can make (the error says the nearest it
+can); a bodyweight exercise has neither.
+
+**Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
+<a name="module_planChecks..sessionsFitTheTime"></a>
+
+### planChecks~sessionsFitTheTime()
+A day's sets fit in the session: a warm-up, then each set with its rest.
+
+**Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
+<a name="module_planChecks..mustIncludesEveryWeek"></a>
+
+### planChecks~mustIncludesEveryWeek()
+Every must-include exercise is in every week.
+
+**Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
+<a name="module_planChecks..weeklySetsPerMuscle"></a>
+
+### planChecks~weeklySetsPerMuscle()
+No muscle gets more than the weekly limit of weighted sets in any week.
+
+**Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
+<a name="module_planChecks..restBetweenHardDays"></a>
+
+### planChecks~restBetweenHardDays()
+A muscle worked hard one day gets the next day off from hard work (also from a Sunday into the next Monday).
+
+**Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
+<a name="module_planChecks..weightsRiseGradually"></a>
+
+### planChecks~weightsRiseGradually()
+Each lift's top weight rises at most 10% a week (or one step of its equipment, when that's more), starting from
+its last logged session. Dropping is always fine.
+
+**Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
+<a name="module_planChecks..lastWeekTestsGoal"></a>
+
+### planChecks~lastWeekTestsGoal()
+The last week tests the goal: its lift for the goal's reps, at the goal's weight (rounded to the equipment) or more.
+
+**Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
+<a name="module_planChecks..PlanError"></a>
+
+### planChecks~PlanError : <code>Object</code>
+**Kind**: inner typedef of [<code>planChecks</code>](#module_planChecks)  
+**Properties**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| path | <code>string</code> | the field, e.g. 'weeks[1].days[0].exercises[2].weight'; '' for the plan as a whole |
+| message | <code>string</code> |  |
+
+<a name="module_planChecks..PlanLayout"></a>
+
+### planChecks~PlanLayout : <code>Object</code>
+**Kind**: inner typedef of [<code>planChecks</code>](#module_planChecks)  
+**Properties**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| weeks | <code>Array.&lt;Object&gt;</code> | the plan's weeks (none when it has none) |
+| days | <code>Array.&lt;{path: string, weekIndex: number, day: Object, dayNumber: number}&gt;</code> | dayNumber counts from the plan's first Monday (week 2's Monday is 8), so rest between days is a subtraction |
+| items | <code>Array.&lt;{path: string, weekIndex: number, dayNumber: number, item: Object, exercise: (Object\|undefined)}&gt;</code> | every exercise in the plan, with its exercise from the context (undefined when the id isn't one) |
+
+<a name="module_gymProfile"></a>
+
+## gymProfile
+The gym a plan is built for: which equipment there is, the weights each piece can actually be set to, and the
+days and time there are to train. A plan's weights must be ones the equipment can make (a barbell can't hold 137
+lbs with 2.5 lb plates), so every weight is rounded to its equipment's steps.
+
+A loaded piece of equipment is `{unit, min, step, max}`: it makes min, min + step, min + 2 x step, ... up to max
+(no max: no limit). A barbell with a 45 lb bar and 2.5 lb plates is min 45, step 5 (one plate a side). Equipment
+with no weight of its own (a bench, a pull-up bar) is `{}`. LJS-2, 2026-11-26.
+
+
+* [gymProfile](#module_gymProfile)
+    * _static_
+        * [.placeholderProfile](#module_gymProfile.placeholderProfile) : <code>GymProfile</code>
+        * [.isLoaded](#module_gymProfile.isLoaded) ⇒ <code>boolean</code>
+        * [.roundToEquipment](#module_gymProfile.roundToEquipment) ⇒ <code>Object</code>
+        * [.canMake](#module_gymProfile.canMake) ⇒ <code>boolean</code>
+    * _inner_
+        * [~Equipment](#module_gymProfile..Equipment) : <code>Object</code>
+        * [~GymProfile](#module_gymProfile..GymProfile) : <code>Object</code>
+
+<a name="module_gymProfile.placeholderProfile"></a>
+
+### gymProfile.placeholderProfile : <code>GymProfile</code>
+PLACEHOLDER values, not Joshua's gym yet: his list (equipment steps, days, session length, must-haves and
+no-gos, the v1 goal) replaces these. The equipment ids are the ones in database/equipment.
+
+**Kind**: static constant of [<code>gymProfile</code>](#module_gymProfile)  
+<a name="module_gymProfile.isLoaded"></a>
+
+### gymProfile.isLoaded ⇒ <code>boolean</code>
+Whether the equipment takes a weight (a barbell, a machine) or not (a bench).
+
+**Kind**: static constant of [<code>gymProfile</code>](#module_gymProfile)  
+
+| Param | Type |
+| --- | --- |
+| equipment | <code>Equipment</code> | 
+
+<a name="module_gymProfile.roundToEquipment"></a>
+
+### gymProfile.roundToEquipment ⇒ <code>Object</code>
+The nearest weight the equipment can make, in its own unit; a weight in another unit is converted first.
+Below its lightest it's the lightest, above its heaviest the heaviest.
+
+**Kind**: static constant of [<code>gymProfile</code>](#module_gymProfile)  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| weight | <code>Object</code> |  |
+| equipment | <code>Equipment</code> | loaded |
+
+<a name="module_gymProfile.canMake"></a>
+
+### gymProfile.canMake ⇒ <code>boolean</code>
+Whether the equipment can make exactly this weight, in its own unit.
+
+**Kind**: static constant of [<code>gymProfile</code>](#module_gymProfile)  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| weight | <code>Object</code> |  |
+| equipment | <code>Equipment</code> | loaded |
+
+<a name="module_gymProfile..Equipment"></a>
+
+### gymProfile~Equipment : <code>Object</code>
+**Kind**: inner typedef of [<code>gymProfile</code>](#module_gymProfile)  
+**Properties**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| [unit] | <code>string</code> | 'kg' or 'lbs'; only loaded equipment has one |
+| [min] | <code>number</code> | the lightest weight it makes |
+| [step] | <code>number</code> | the smallest change in weight |
+| [max] | <code>number</code> | the heaviest weight it makes (none: no limit) |
+
+<a name="module_gymProfile..GymProfile"></a>
+
+### gymProfile~GymProfile : <code>Object</code>
+**Kind**: inner typedef of [<code>gymProfile</code>](#module_gymProfile)  
+**Properties**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| unit | <code>string</code> | the unit plans are shown in |
+| daysPerWeek | <code>number</code> | most training days in a week |
+| sessionMinutes | <code>number</code> | longest session |
+| bodyweight | <code>Object</code> \| <code>null</code> |  |
+| equipment | <code>Object.&lt;string, Equipment&gt;</code> | by equipment id; missing means the gym doesn't have it |
+| mustInclude | <code>Array.&lt;string&gt;</code> | exercise ids |
+| avoid | <code>Array.&lt;string&gt;</code> | exercise ids |
 
 <a name="module_units"></a>
 
@@ -925,4 +1368,72 @@ is already more than a day before the local "now" (21:30 in Toronto counted yest
 | Param |
 | --- |
 | date | 
+
+<a name="PlanExercise"></a>
+
+## PlanExercise : <code>Object</code>
+**Kind**: global typedef  
+**Properties**
+
+| Name | Type |
+| --- | --- |
+| exerciseId | <code>string</code> | 
+| equipmentId | <code>string</code> \| <code>null</code> | 
+| sets | <code>number</code> | 
+| reps | <code>number</code> | 
+| weight | <code>Object</code> \| <code>null</code> | 
+
+<a name="Plan"></a>
+
+## Plan : <code>Object</code>
+**Kind**: global typedef  
+**Properties**
+
+| Name | Type |
+| --- | --- |
+| summary | <code>string</code> | 
+| weeks | <code>Array.&lt;{week: number, days: Array.&lt;{dayOfWeek: number, exercises: Array.&lt;PlanExercise&gt;}&gt;}&gt;</code> | 
+
+<a name="Goal"></a>
+
+## Goal : <code>Object</code>
+**Kind**: global typedef  
+**Properties**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| exerciseId | <code>string</code> | v1: one strength goal on one exercise |
+| weight | <code>Object</code> | the weight to lift |
+| reps | <code>number</code> | for this many reps |
+| weeks | <code>number</code> | 4 to 12 |
+
+<a name="ContextExercise"></a>
+
+## ContextExercise : <code>Object</code>
+**Kind**: global typedef  
+**Properties**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| id | <code>string</code> |  |
+| name | <code>string</code> |  |
+| equipment | <code>Array.&lt;string&gt;</code> | equipment ids it needs, all in the gym |
+| loadedEquipment | <code>string</code> \| <code>null</code> | the one that takes the weight, or null |
+| muscles | <code>Array.&lt;{muscleId: string, name: string, share: number}&gt;</code> | share of the work, 0-100 |
+| last | <code>Object</code> \| <code>null</code> |  |
+| estimatedMax | <code>Object</code> \| <code>null</code> | in the profile's unit |
+
+<a name="PlanContext"></a>
+
+## PlanContext : <code>Object</code>
+**Kind**: global typedef  
+**Properties**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| today | <code>string</code> | 'YYYY-MM-DD' |
+| goal | <code>Object</code> | the goal with its exercise's name, its estimated max now and the max the target implies |
+| profile | <code>GymProfile</code> |  |
+| exercises | [<code>Array.&lt;ContextExercise&gt;</code>](#ContextExercise) |  |
+| musclePriority | <code>Array.&lt;Object&gt;</code> |  |
 
