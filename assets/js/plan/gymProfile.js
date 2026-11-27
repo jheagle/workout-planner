@@ -78,7 +78,9 @@ export const joshuaProfile = {
     '8bcd9730-f417-4397-a059-8ac13a830d4f': { equipment: 'machine', name: 'shoulder press', unit: 'lbs', min: 20, step: 20 }
   },
   mustInclude: [PULL_UPS], // exercise ids every week must have
-  avoid: [], // exercise ids a plan must never use
+  avoid: [ // exercise ids a plan must never use
+    'f0a889fb-6ce0-4511-ae93-9836b71b204c' // Lateral Raises: the previous gym's machine; this gym has none (cable or dumbbells instead)
+  ],
   deloadEvery: 4, // a lighter week every 4th week (Joshua's history dips about every 3-4 weeks)
   // Joshua's phases from his Garmin weight (checked with him 2026-11-27): bulk Sep 2024 to Jul 2025, cut Mar to Jun
   // 2026, bulk since Aug 2026, cut Mar to Jun 2027 (his usual pattern, confirmed).
