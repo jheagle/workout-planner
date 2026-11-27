@@ -61,8 +61,8 @@ const groupBy = (rows, field) => {
 /**
  * The context for one plan.
  * @param {Object} options
- * @param {import('./planSchema.js').Goal} options.goal
- * @param {import('./gymProfile.js').GymProfile} options.profile
+ * @param {Goal} options.goal
+ * @param {GymProfile} options.profile
  * @param {PlanRows} options.rows
  * @param {Date} [options.today] - injectable for testing; only its local date counts
  * @returns {PlanContext}
@@ -153,7 +153,7 @@ export const buildPlanContext = ({ goal, profile, rows, today = new Date() }) =>
  * @typedef {Object} PlanContext
  * @property {string} today - 'YYYY-MM-DD'
  * @property {Object} goal - the goal with its exercise's name, its estimated max now and the max the target implies
- * @property {import('./gymProfile.js').GymProfile} profile
+ * @property {GymProfile} profile
  * @property {ContextExercise[]} exercises
  * @property {Array<Object>} musclePriority
  */

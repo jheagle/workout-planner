@@ -49,8 +49,8 @@ const isWholeIn = (value, min, max) => Number.isInteger(value) && value >= min &
 /**
  * Whether a goal can be planned for: its exercise is one this gym allows, and it's a strength goal v1 handles in a
  * realistic time.
- * @param {import('./planSchema.js').Goal} goal
- * @param {import('./planContext.js').PlanContext} context
+ * @param {Goal} goal
+ * @param {PlanContext} context
  * @returns {PlanError[]}
  */
 export const checkGoal = (goal, context) => {
@@ -96,8 +96,8 @@ export const checkGoal = (goal, context) => {
 
 /**
  * The plan as flat lists, each entry with its path, so every rule is a simple loop.
- * @param {import('./planSchema.js').Plan} plan
- * @param {import('./planContext.js').PlanContext} context
+ * @param {Plan} plan
+ * @param {PlanContext} context
  * @returns {PlanLayout}
  */
 const layOut = (plan, context) => {
@@ -347,8 +347,8 @@ export const PLAN_RULES = [
 
 /**
  * Every problem with a plan, or none.
- * @param {import('./planSchema.js').Plan} plan
- * @param {import('./planContext.js').PlanContext} context
+ * @param {Plan} plan
+ * @param {PlanContext} context
  * @returns {PlanError[]}
  */
 export const checkPlan = (plan, context) => {
