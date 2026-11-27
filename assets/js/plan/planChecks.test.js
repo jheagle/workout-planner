@@ -190,6 +190,64 @@ describe('checkPlan', () => {
   })
 })
 
+describe('checkPlan with the profile\'s week', () => {
+  const withProfile = changes => contextFor({ profile: { ...fixtureProfile(), ...changes } })
+
+  test('only on the training days, when the profile names them', () => {
+    const errors = checkPlan(validPlan(), withProfile({ trainingDays: [1, 3] }))
+    expect(paths(errors)).toEqual([0, 1, 2, 3].map(week => `weeks[${week}].days[2].dayOfWeek`))
+    expect(errors[0].message).toBe('Friday isn\'t a training day; train on Monday and Wednesday')
+  })
+
+  test('every session starts with the first exercise', () => {
+    const errors = checkPlan(validPlan(), withProfile({ firstExercise: 'pullup' }))
+    expect(errors).toHaveLength(12)
+    expect(errors[0]).toEqual({ path: 'weeks[0].days[0].exercises[0]', message: 'every session starts with Pull-up' })
+    const pullUpsFirst = planWith(plan => plan.weeks.forEach(week => week.days.forEach(day => day.exercises.unshift(day.exercises.pop()))))
+    expect(checkPlan(pullUpsFirst, withProfile({ firstExercise: 'pullup' }))).toEqual([])
+  })
+
+  test('the sets per exercise can be narrowed by the profile', () => {
+    const errors = checkPlan(validPlan(), withProfile({ setsPerExercise: { min: 1, max: 2 } }))
+    expect(errors[0]).toEqual({ path: 'weeks[0].days[0].exercises[0].sets', message: 'must be a whole number from 1 to 2' })
+    expect(errors.some(error => error.path.startsWith('weeks[2]'))).toBe(false) // the taper week has 2 sets
+  })
+
+  test('every muscle group worked on enough days, except in the test week', () => {
+    expect(checkPlan(validPlan(), withProfile({ minDaysPerMuscle: 2 }))).toEqual([])
+    // Squats only on Monday in week 1, and nowhere in week 4 (the test week, not counted)
+    const plan = planWith(plan => {
+      plan.weeks[0].days[1].exercises.splice(1, 1)
+      plan.weeks[0].days[2].exercises.splice(1, 1)
+      plan.weeks[3].days.forEach(day => day.exercises.splice(1, 1))
+    })
+    expect(checkPlan(plan, withProfile({ minDaysPerMuscle: 2 }))).toEqual([{
+      path: 'weeks[0]', message: 'Quadriceps is worked on 1 day; every muscle group needs 1+ weighted set on 2 days a week'
+    }])
+  })
+
+  test('legs are rested for a run: not worked hard that day or the day before', () => {
+    // A Tuesday run after Monday's 3 sets of squats; week 3 (the taper) has only 2
+    const errors = checkPlan(validPlan(), withProfile({ otherTraining: [{ dayOfWeek: 2, activity: 'run' }] }))
+    expect(paths(errors)).toEqual(['weeks[0]', 'weeks[1]', 'weeks[3]'])
+    expect(errors[0].message).toBe('Quadriceps is worked hard on Monday (3 weighted sets), the day before the Tuesday run; keep it under 3 then')
+    // A run on a training day counts that day; an activity with no muscles listed is ignored
+    const sameDay = checkPlan(validPlan(), withProfile({ otherTraining: [{ dayOfWeek: 5, activity: 'run' }] }))
+    expect(paths(sameDay)).toEqual(['weeks[0]', 'weeks[1]', 'weeks[3]'])
+    expect(sameDay[0].message).toMatch(/on Friday \(3 weighted sets\), the same day the Friday run/)
+    expect(checkPlan(validPlan(), withProfile({ otherTraining: [{ dayOfWeek: 2, activity: 'swim' }] }))).toEqual([])
+  })
+
+  test('a machine of its own sets the weights, and the error names it', () => {
+    const machines = { bench: { equipment: 'barbell', name: 'bench station', unit: 'lbs', min: 45, step: 10 } }
+    const errors = checkPlan(validPlan(), withProfile({ machines }))
+    expect(errors).toContainEqual({
+      path: 'weeks[1].days[0].exercises[0].weight',
+      message: 'the bench station can\'t make 170 lbs (lbs, from 45 in steps of 10); nearest is 175 lbs'
+    })
+  })
+})
+
 describe('checkPlan with lighter weeks', () => {
   const goal = { ...fixtureGoal(), weeks: 8 }
   const context = () => contextFor({ goal })

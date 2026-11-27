@@ -1,4 +1,5 @@
-import { canMake, isLoaded, placeholderProfile, roundToEquipment } from './gymProfile.js'
+import { existsSync } from 'node:fs'
+import { canMake, isLoaded, joshuaProfile, loadFor, roundToEquipment } from './gymProfile.js'
 
 const barbell = { unit: 'lbs', min: 45, step: 5 }
 const dumbbells = { unit: 'kg', min: 2.5, step: 2.5, max: 40 }
@@ -44,9 +45,42 @@ describe('canMake', () => {
   })
 })
 
-describe('placeholderProfile', () => {
+describe('loadFor', () => {
+  const profile = {
+    equipment: { barbell: { unit: 'lbs', min: 45, step: 10 }, bench: {}, machine: { unit: 'lbs', min: 10, step: 10 } },
+    machines: { 'leg-curl': { equipment: 'machine', name: 'leg curl', unit: 'lbs', min: 10, step: 20 } }
+  }
+
+  test('an exercise\'s own machine comes first', () => {
+    expect(loadFor(profile, 'leg-curl', ['machine'])).toEqual({ equipmentId: 'machine', load: { name: 'leg curl', unit: 'lbs', min: 10, step: 20 } })
+  })
+
+  test('otherwise the first equipment that takes a weight; none for bodyweight', () => {
+    expect(loadFor(profile, 'bench-press', ['bench', 'barbell'])).toEqual({ equipmentId: 'barbell', load: profile.equipment.barbell })
+    expect(loadFor(profile, 'push-up', ['bench'])).toBeNull()
+    expect(loadFor({ equipment: {} }, 'push-up', [])).toBeNull()
+  })
+})
+
+describe('joshuaProfile', () => {
+  test('every machine is a real exercise, counted as equipment the gym has, with its weights', () => {
+    Object.entries(joshuaProfile.machines).forEach(([exerciseId, machine]) => {
+      expect(existsSync(`database/exercises/${exerciseId}.json`)).toBe(true)
+      expect(isLoaded(joshuaProfile.equipment[machine.equipment])).toBe(true)
+      expect(machine.step).toBeGreaterThan(0)
+      expect(machine.max === undefined || machine.max >= machine.min).toBe(true)
+    })
+  })
+
+  test('training days, other training and the first exercise fit together', () => {
+    const { trainingDays, otherTraining, daysPerWeek, firstExercise, mustInclude } = joshuaProfile
+    expect(trainingDays).toHaveLength(daysPerWeek)
+    otherTraining.forEach(({ dayOfWeek }) => expect(trainingDays).not.toContain(dayOfWeek))
+    expect(mustInclude).toContain(firstExercise)
+  })
+
   test('every loaded piece has a unit, a lightest weight and a step', () => {
-    Object.values(placeholderProfile.equipment).filter(isLoaded).forEach(equipment => {
+    Object.values(joshuaProfile.equipment).filter(isLoaded).forEach(equipment => {
       expect(['kg', 'lbs']).toContain(equipment.unit)
       expect(typeof equipment.min).toBe('number')
       expect(equipment.step).toBeGreaterThan(0)

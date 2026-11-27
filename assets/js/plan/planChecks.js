@@ -25,11 +25,23 @@ export const LIMITS = {
   warmUpMinutes: 10,
   maxWeeklySets: 20, // weighted sets per muscle per week (10-20 is the common range for growth)
   hardDaySets: 3, // weighted sets on a day that make it a hard day for that muscle
+  workedDaySets: 1, // weighted sets on a day that count as working a muscle group that day
   minDaysBetweenHardDays: 2, // no muscle hard on two days in a row
   lighterSetsShare: 0.6, // a lighter week has at most 60% of the sets of the build week before it
   taperSetsShare: 0.7 // the taper week has at most 70%
   // How fast weights may climb depends on the phase: PHASE_PACE in planSchedule.js
 }
+
+/**
+ * The muscle groups (database/muscles ids) each kind of other training uses: on its day and the day before, none is
+ * worked hard, so a run starts on recovered legs. Calves, glutes, hamstrings and quadriceps.
+ */
+export const ACTIVITY_MUSCLE_GROUPS = {
+  run: ['3', '7', '8', '12'],
+  bike: ['7', '8', '12']
+}
+
+const WEEKDAYS = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
 /**
  * @typedef {Object} PlanError
@@ -161,6 +173,32 @@ const weightedSetsByMuscleAndDay = items => {
   return totals
 }
 
+/**
+ * Weighted sets per muscle group per day (a group's muscles added up: upper and lower chest are Pectorals).
+ * @returns {Map<string, Map<number, number>>} groupId -> dayNumber -> weighted sets
+ */
+const weightedSetsByGroupAndDay = items => {
+  const totals = new Map()
+  known(items).forEach(({ dayNumber, item, exercise }) => {
+    const sets = Number.isInteger(item.sets) ? item.sets : 0
+    exercise.muscles.forEach(({ groupId, share }) => {
+      if (!totals.has(groupId)) totals.set(groupId, new Map())
+      const byDay = totals.get(groupId)
+      byDay.set(dayNumber, (byDay.get(dayNumber) || 0) + sets * share / 100)
+    })
+  })
+  return totals
+}
+
+// 'Pectorals' for the group of 'Pectorals: Upper chest'
+const groupName = (context, groupId) => {
+  for (const exercise of context.exercises) {
+    const muscle = exercise.muscles.find(row => row.groupId === groupId)
+    if (muscle) return muscle.name.split(': ')[0]
+  }
+  return groupId
+}
+
 /** All the sets planned in each week, by week index. */
 const setsByWeek = (items, weekCount) => {
   const totals = Array(weekCount).fill(0)
@@ -238,17 +276,20 @@ const exercisesAreKnown = ({ items }, { profile }) => {
   })
 }
 
-/** Sets and reps are whole numbers in range. */
-const setsAndRepsInRange = ({ items }) => known(items).flatMap(({ path, item }) => [
-  isWholeIn(item.sets, LIMITS.minSets, LIMITS.maxSets) ? null : error(`${path}.sets`, `must be a whole number from ${LIMITS.minSets} to ${LIMITS.maxSets}`),
-  isWholeIn(item.reps, LIMITS.minReps, LIMITS.maxReps) ? null : error(`${path}.reps`, `must be a whole number from ${LIMITS.minReps} to ${LIMITS.maxReps}`)
-].filter(Boolean))
+/** Sets and reps are whole numbers in range; the profile can narrow the sets (setsPerExercise). */
+const setsAndRepsInRange = ({ items }, { profile }) => {
+  const { min, max } = profile.setsPerExercise || { min: LIMITS.minSets, max: LIMITS.maxSets }
+  return known(items).flatMap(({ path, item }) => [
+    isWholeIn(item.sets, min, max) ? null : error(`${path}.sets`, `must be a whole number from ${min} to ${max}`),
+    isWholeIn(item.reps, LIMITS.minReps, LIMITS.maxReps) ? null : error(`${path}.reps`, `must be a whole number from ${LIMITS.minReps} to ${LIMITS.maxReps}`)
+  ].filter(Boolean))
+}
 
 /**
  * A loaded exercise names its equipment and has a weight that equipment can make (the error says the nearest it
  * can); a bodyweight exercise has neither.
  */
-const weightsFitEquipment = ({ items }, { profile }) => known(items).flatMap(({ path, item, exercise }) => {
+const weightsFitEquipment = ({ items }) => known(items).flatMap(({ path, item, exercise }) => {
   const equipmentId = exercise.loadedEquipment
   if (!equipmentId) {
     return [
@@ -256,14 +297,15 @@ const weightsFitEquipment = ({ items }, { profile }) => known(items).flatMap(({ 
       item.weight === null ? null : error(`${path}.weight`, `${exercise.name} takes no weight; use null`)
     ].filter(Boolean)
   }
-  const equipment = profile.equipment[equipmentId]
+  const equipment = exercise.load
+  const label = equipment.name || equipmentId
   const errors = []
   if (item.equipmentId !== equipmentId) errors.push(error(`${path}.equipmentId`, `should be ${equipmentId}`))
   if (!item.weight) {
-    errors.push(error(`${path}.weight`, `${exercise.name} needs a weight on the ${equipmentId}`))
+    errors.push(error(`${path}.weight`, `${exercise.name} needs a weight on the ${label}`))
   } else if (!canMake(item.weight, equipment)) {
     const range = `${equipment.unit}, from ${equipment.min} in steps of ${equipment.step}${equipment.max !== undefined ? ` up to ${equipment.max}` : ''}`
-    errors.push(error(`${path}.weight`, `the ${equipmentId} can't make ${weightText(item.weight)} (${range}); ` +
+    errors.push(error(`${path}.weight`, `the ${label} can't make ${weightText(item.weight)} (${range}); ` +
       `nearest is ${weightText(roundToEquipment(item.weight, equipment))}`))
   }
   return errors
@@ -316,16 +358,86 @@ const restBetweenHardDays = ({ items }, context) => {
   return errors
 }
 
+/** When the profile names its training days, every day is one of them. */
+const daysAreTrainingDays = ({ days }, { profile }) => {
+  if (!Array.isArray(profile.trainingDays)) return []
+  const allowed = profile.trainingDays.map(day => WEEKDAYS[day]).join(' and ')
+  return days
+    .filter(({ day }) => isWholeIn(day.dayOfWeek, 1, 7) && !profile.trainingDays.includes(day.dayOfWeek))
+    .map(({ path, day }) => error(`${path}.dayOfWeek`, `${WEEKDAYS[day.dayOfWeek]} isn't a training day; train on ${allowed}`))
+}
+
+/** When the profile names a first exercise, every session starts with it. */
+const sessionsStartRight = ({ days }, { profile, exercises }) => {
+  if (!profile.firstExercise) return []
+  const first = String(profile.firstExercise)
+  const exercise = exercises.find(row => row.id === first)
+  return days
+    .filter(({ day }) => Array.isArray(day.exercises) && day.exercises.length && String(day.exercises[0].exerciseId) !== first)
+    .map(({ path }) => error(`${path}.exercises[0]`, `every session starts with ${exercise ? exercise.name : first}`))
+}
+
+/**
+ * When the profile asks for it, every muscle group the gym's exercises work gets at least one weighted set on that
+ * many days of each week (the test week is left out: it's for the test).
+ */
+const musclesWorkedEnoughDays = ({ weeks, items }, context) => {
+  const days = context.profile.minDaysPerMuscle
+  if (!days || weeks.length !== context.schedule.length) return []
+  const groups = [...new Set(context.exercises.flatMap(exercise => exercise.muscles.map(({ groupId }) => groupId)))].sort()
+  const byGroup = weightedSetsByGroupAndDay(items)
+  const errors = []
+  context.schedule.forEach(({ kind }, weekIndex) => {
+    if (kind === 'test') return
+    groups.forEach(groupId => {
+      const worked = [...(byGroup.get(groupId) || new Map())]
+        .filter(([day, sets]) => Math.ceil(day / 7) - 1 === weekIndex && sets >= LIMITS.workedDaySets - EPSILON).length
+      if (worked < days) {
+        errors.push(error(`weeks[${weekIndex}]`, `${groupName(context, groupId)} is worked on ${worked} day${worked === 1 ? '' : 's'}; ` +
+          `every muscle group needs ${LIMITS.workedDaySets}+ weighted set on ${days} days a week`))
+      }
+    })
+  })
+  return errors
+}
+
+/**
+ * Other training (a run on Wednesday) starts recovered: the muscle groups it uses aren't worked hard that day or the
+ * day before.
+ */
+const otherTrainingRested = ({ weeks, items }, context) => {
+  const events = (context.profile.otherTraining || []).filter(({ activity }) => ACTIVITY_MUSCLE_GROUPS[activity])
+  if (!events.length) return []
+  const byGroup = weightedSetsByGroupAndDay(items)
+  const errors = []
+  weeks.forEach((week, weekIndex) => events.forEach(({ dayOfWeek, activity }) => {
+    const eventDay = weekIndex * 7 + dayOfWeek
+    ACTIVITY_MUSCLE_GROUPS[activity].forEach(groupId => {
+      const byDay = byGroup.get(groupId)
+      if (!byDay) return
+      ;[eventDay - 1, eventDay].forEach(day => {
+        const sets = byDay.get(day) || 0
+        if (sets < LIMITS.hardDaySets) return
+        const dayWeek = Math.ceil(day / 7) - 1
+        const when = day === eventDay ? 'the same day' : 'the day before'
+        errors.push(error(`weeks[${dayWeek}]`, `${groupName(context, groupId)} is worked hard on ${WEEKDAYS[day - dayWeek * 7]} ` +
+          `(${formatAmount(sets)} weighted sets), ${when} the ${WEEKDAYS[dayOfWeek]} ${activity}; keep it under ${LIMITS.hardDaySets} then`))
+      })
+    })
+  }))
+  return errors
+}
+
 /**
  * Each lift's top weight rises at most its phase's jump a week (10% in a bulk, 5% in a cut; or one step of its
  * equipment, when that's more), starting from its last logged session. A lighter week isn't the baseline for the
  * week after it: the climb carries on from the build week before. Dropping is always fine.
  */
-const weightsRiseGradually = ({ items }, { profile, schedule }) => {
+const weightsRiseGradually = ({ items }, { schedule }) => {
   const errors = []
   for (const byWeek of topWeights(items).values()) {
     const { exercise } = byWeek.values().next().value
-    const equipment = profile.equipment[exercise.loadedEquipment]
+    const equipment = exercise.load
     const last = exercise.last && exercise.last.weight
     let previous = last ? { amount: convertWeight(last.amount, last.unit, equipment.unit), label: 'the last session' } : null
     ;[...byWeek.keys()].sort((first, second) => first - second).forEach(weekIndex => {
@@ -377,13 +489,12 @@ const lighterWeeksAreLighter = ({ weeks, items }, { schedule }) => {
 }
 
 /** The last week tests the goal: its lift for the goal's reps, at the goal's weight (rounded to the equipment) or more. */
-const lastWeekTestsGoal = ({ weeks, items }, { goal, profile, exercises }) => {
+const lastWeekTestsGoal = ({ weeks, items }, { goal, exercises }) => {
   const exercise = exercises.find(row => row.id === goal.exerciseId)
   // A plan of the wrong length is already an error, and an unplannable goal is checkGoal's
   if (weeks.length !== goal.weeks || !exercise) return []
   const lastWeek = weeks.length - 1
-  const equipment = exercise.loadedEquipment ? profile.equipment[exercise.loadedEquipment] : null
-  const target = equipment ? roundToEquipment(goal.weight, equipment) : null
+  const target = exercise.load ? roundToEquipment(goal.weight, exercise.load) : null
   const heavyEnough = weight => !target || (weight && weight.unit === target.unit && weight.amount >= target.amount - EPSILON)
   const tested = known(items).some(({ weekIndex, item, exercise: planned }) =>
     weekIndex === lastWeek && planned.id === exercise.id && item.reps >= goal.reps && heavyEnough(item.weight))
@@ -401,7 +512,9 @@ export const PLAN_RULES = [
   weeksAreNumbered,
   daysFitTheWeek,
   weekdaysAreValid,
+  daysAreTrainingDays,
   daysHaveExercises,
+  sessionsStartRight,
   exercisesAreKnown,
   setsAndRepsInRange,
   weightsFitEquipment,
@@ -409,6 +522,8 @@ export const PLAN_RULES = [
   mustIncludesEveryWeek,
   weeklySetsPerMuscle,
   restBetweenHardDays,
+  musclesWorkedEnoughDays,
+  otherTrainingRested,
   weightsRiseGradually,
   lighterWeeksAreLighter,
   lastWeekTestsGoal

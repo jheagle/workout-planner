@@ -5,7 +5,7 @@ import { setUp } from 'test-filesystem'
 import { query } from '../data/index.js'
 import { createTestDatabase } from '../data/testDatabase.js'
 import { buildPlanContext, readPlanRows } from './planContext.js'
-import { placeholderProfile } from './gymProfile.js'
+import { joshuaProfile } from './gymProfile.js'
 
 const databasePath = 'plan-context-test-database/'
 setUp.setDefaults(databasePath)
@@ -24,7 +24,7 @@ describe('readPlanRows against a real database', () => {
 
     const bench = rows.exercises.find(row => row.name === 'Bench Press')
     const goal = { exerciseId: bench._id, weight: { amount: 135, unit: 'lbs' }, reps: 10, weeks: 8 }
-    const context = buildPlanContext({ goal, profile: placeholderProfile, rows, today: new Date(2024, 5, 8) })
+    const context = buildPlanContext({ goal, profile: joshuaProfile, rows, today: new Date(2024, 5, 8) })
     // 120 x (1 + 10/30) = 160
     expect(context.goal.estimatedMax).toEqual({ amount: 160, unit: 'lbs' })
     expect(context.exercises).toHaveLength(3)

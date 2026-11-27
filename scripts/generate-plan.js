@@ -17,7 +17,7 @@
 import { writeFile } from 'node:fs/promises'
 import { configure, query } from 'json-fs-query'
 import { readPlanRows } from '../assets/js/plan/planContext.js'
-import { placeholderProfile } from '../assets/js/plan/gymProfile.js'
+import { joshuaProfile } from '../assets/js/plan/gymProfile.js'
 import { generatePlan } from '../assets/js/plan/generatePlan.js'
 import { claudePlanModel } from '../assets/js/plan/planModel.js'
 
@@ -71,14 +71,14 @@ const main = async () => {
 
   const goal = {
     exerciseId: String(exercise._id),
-    weight: { amount: Number(option('weight')), unit: option('unit', placeholderProfile.unit) },
+    weight: { amount: Number(option('weight')), unit: option('unit', joshuaProfile.unit) },
     reps: Number(option('reps', 1)),
     weeks: Number(option('weeks', 8)),
     startDate: option('start')
   }
   const progress = progressLine()
   const model = claudePlanModel({ model: option('model', 'claude-opus-5-5'), effort: option('effort', 'high'), onProgress: progress.onProgress })
-  const result = await generatePlan({ goal, profile: placeholderProfile, rows, model })
+  const result = await generatePlan({ goal, profile: joshuaProfile, rows, model })
   progress.done()
 
   console.log(`Goal: ${exercise.name}, ${goal.reps} x ${goal.weight.amount} ${goal.weight.unit} in ${goal.weeks} weeks`)
