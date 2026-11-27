@@ -41,7 +41,16 @@ export const placeholderProfile = {
     suspension_trainer_trx: {}
   },
   mustInclude: [], // exercise ids every week must have
-  avoid: [] // exercise ids a plan must never use
+  avoid: [], // exercise ids a plan must never use
+  deloadEvery: 4, // a lighter week every 4th week (Joshua's history dips about every 3-4 weeks)
+  // Joshua's phases from his Garmin weight (checked with him 2026-11-27): bulk Sep 2024 to Jul 2025, cut Mar to Jun
+  // 2026, bulk since Aug 2026. The next cut is his usual March start, a guess until he plans it.
+  phases: [
+    { phase: 'bulk', from: '2024-09-01', to: '2025-07-31' },
+    { phase: 'cut', from: '2026-03-01', to: '2026-06-30' },
+    { phase: 'bulk', from: '2026-08-01', to: '2027-02-28' },
+    { phase: 'cut', from: '2027-03-01', to: '2027-06-30' }
+  ]
 }
 
 /**
@@ -61,6 +70,9 @@ export const placeholderProfile = {
  * @property {Object<string, Equipment>} equipment - by equipment id; missing means the gym doesn't have it
  * @property {string[]} mustInclude - exercise ids
  * @property {string[]} avoid - exercise ids
+ * @property {(number|null)} [deloadEvery] - a lighter week every this many weeks (default 4; 0 or null: none)
+ * @property {Array<{phase: string, from: string, to: (string|undefined)}>} [phases] - 'cut', 'maintain' or 'bulk'
+ * from one date to another ('YYYY-MM-DD', both ends included); a date outside them is maintain
  */
 
 /**

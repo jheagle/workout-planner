@@ -1,7 +1,8 @@
 /**
  * What a plan is built from, gathered by code (never by the model): the exercises this gym's equipment allows, each
  * with the muscles it works, its last session and an estimated one-rep max, plus the goal, the gym profile and the
- * muscles that need attention now. The same context goes to the model and to the checks. LJS-2, 2026-11-26.
+ * muscles that need attention now, and the schedule of weeks (planSchedule.js). The same context goes to the model
+ * and to the checks. LJS-2, 2026-11-26.
  * @module planContext
  */
 
@@ -9,6 +10,7 @@ import { convertWeight, workoutWeight } from '../data/units.js'
 import { localDate } from '../data/localDate.js'
 import { musclePriority } from '../data/musclePriority.js'
 import { isLoaded } from './gymProfile.js'
+import { buildSchedule } from './planSchedule.js'
 
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000
 const HISTORY_DAYS = 90 // the estimated max comes from the last 90 days of a lift
@@ -131,6 +133,7 @@ export const buildPlanContext = ({ goal, profile, rows, today = new Date() }) =>
       targetMax: { amount: round1(estimateMax(convertWeight(goal.weight.amount, goal.weight.unit, profile.unit), goal.reps)), unit: profile.unit }
     },
     profile,
+    schedule: buildSchedule({ weeks: goal.weeks, profile, today }),
     exercises,
     musclePriority: priority.map(({ muscleId, name, weeklySets, daysSinceLastWorked, needsPriority }) => ({
       muscleId: String(muscleId), name, weeklySets, daysSinceLastWorked: Number.isFinite(daysSinceLastWorked) ? daysSinceLastWorked : null, needsPriority
@@ -154,6 +157,7 @@ export const buildPlanContext = ({ goal, profile, rows, today = new Date() }) =>
  * @property {string} today - 'YYYY-MM-DD'
  * @property {Object} goal - the goal with its exercise's name, its estimated max now and the max the target implies
  * @property {GymProfile} profile
+ * @property {ScheduleWeek[]} schedule - each week's start, phase and kind (build, lighter, taper, test)
  * @property {ContextExercise[]} exercises
  * @property {Array<Object>} musclePriority
  */

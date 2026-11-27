@@ -32,6 +32,17 @@ describe('checkGoal', () => {
     expect(errors[0].message).toMatch(/about 262\.5 lbs.*192\.5.*about 207\.9/)
   })
 
+  test('pace depends on the phase: a cut climbs slowly', () => {
+    const profile = { ...fixtureProfile(), phases: [{ phase: 'cut', from: '2026-11-01' }] }
+    const errors = checkGoal(fixtureGoal(), contextFor({ profile }))
+    expect(errors[0].message).toMatch(/4 weeks \(all cut\) can realistically reach about 196\.4/)
+    // 180 x 5 needs about 210: out of reach in maintain (about 207.9), in reach in a bulk (about 211.8)
+    const goal = { ...fixtureGoal(), weight: { amount: 180, unit: 'lbs' } }
+    expect(paths(checkGoal(goal, contextFor({ goal })))).toEqual(['goal'])
+    const bulk = { ...fixtureProfile(), phases: [{ phase: 'bulk', from: '2026-11-01' }] }
+    expect(checkGoal(goal, contextFor({ goal, profile: bulk }))).toEqual([])
+  })
+
   test('a goal with no history to estimate from is not judged on pace', () => {
     const goal = { exerciseId: 'pullup', weight: { amount: 25, unit: 'lbs' }, reps: 8, weeks: 6 }
     expect(checkGoal(goal, contextFor({ goal }))).toEqual([])
@@ -97,9 +108,9 @@ describe('checkPlan', () => {
 
   test('a session must fit its time', () => {
     const profile = { ...fixtureProfile(), sessionMinutes: 30 }
-    // 9 sets: 10 + 22.5 minutes
+    // 9 sets: 10 + 22.5 minutes (the taper week's 6 sets fit)
     const errors = checkPlan(validPlan(), contextFor({ profile }))
-    expect(errors).toHaveLength(12)
+    expect(errors).toHaveLength(9)
     expect(errors[0]).toEqual({ path: 'weeks[0].days[0].exercises', message: '9 sets take about 32.5 minutes; the session is 30' })
   })
 
@@ -128,7 +139,7 @@ describe('checkPlan', () => {
     const errors = checkPlan(jump, contextFor())
     expect(errors[0]).toEqual({
       path: 'weeks[2].days[0].exercises[0].weight',
-      message: 'Barbell bench press jumps from 170 to 195 lbs after week 2; at most 187 lbs'
+      message: 'Barbell bench press jumps from 170 to 195 lbs after week 2; at most 187 lbs in a maintain week'
     })
     const fromHistory = planWith(plan => plan.weeks[0].days.forEach(day => { day.exercises[0].weight.amount = 185 }))
     expect(checkPlan(fromHistory, contextFor())[0].message).toMatch(/jumps from 165 to 185 lbs after the last session; at most 181\.5/)
@@ -151,6 +162,22 @@ describe('checkPlan', () => {
     }])
   })
 
+  test('the taper week has at most 70% of the sets of the build week before it', () => {
+    const plan = planWith(plan => plan.weeks[2].days.forEach(day => day.exercises.forEach(item => { item.sets = 3 })))
+    expect(checkPlan(plan, contextFor())).toEqual([{ path: 'weeks[2]', message: 'week 3 is a taper week: at most 18 sets (70% of week 2\'s 27); it has 27' }])
+  })
+
+  test('the weights may climb more slowly in a cut', () => {
+    const profile = { ...fixtureProfile(), phases: [{ phase: 'cut', from: '2026-11-01' }] }
+    // 165 to 170 is one step: allowed; 170 to 180 is above 5% and above one step
+    const plan = planWith(plan => [2, 3].forEach(week => plan.weeks[week].days.forEach(day => { day.exercises[0].weight.amount = 180 })))
+    const goal = { ...fixtureGoal(), weight: { amount: 160, unit: 'lbs' } }
+    expect(checkPlan(plan, contextFor({ goal, profile }))[0]).toEqual({
+      path: 'weeks[2].days[0].exercises[0].weight',
+      message: 'Barbell bench press jumps from 170 to 180 lbs after week 2; at most 178.5 lbs in a cut week'
+    })
+  })
+
   test('must-include exercises appear every week', () => {
     const profile = { ...fixtureProfile(), mustInclude: ['pullup'] }
     const plan = planWith(plan => plan.weeks[2].days.forEach(day => day.exercises.pop()))
@@ -160,6 +187,58 @@ describe('checkPlan', () => {
   test('a plan with no weeks at all is an error, not a crash', () => {
     expect(paths(checkPlan({ summary: '' }, contextFor()))).toEqual(['weeks'])
     expect(paths(checkPlan(null, contextFor()))).toEqual(['weeks'])
+  })
+})
+
+describe('checkPlan with lighter weeks', () => {
+  const goal = { ...fixtureGoal(), weeks: 8 }
+  const context = () => contextFor({ goal })
+  // Week 4 is lighter, 7 the taper, 8 the test
+  const longPlan = () => ({
+    summary: 'Eight weeks with a lighter week 4.',
+    weeks: [
+      [165, 225, 3], [170, 230, 3], [170, 235, 3], [165, 230, 1],
+      [175, 240, 3], [175, 245, 3], [175, 250, 2], [175, 250, 3]
+    ].map(([bench, squat, sets], index) => ({
+      week: index + 1,
+      days: validPlan().weeks[0].days.map(day => ({
+        dayOfWeek: day.dayOfWeek,
+        exercises: day.exercises.map(item => ({
+          ...item,
+          sets,
+          weight: item.weight && { ...item.weight, amount: item.exerciseId === 'bench' ? bench : squat }
+        }))
+      }))
+    }))
+  })
+  const longPlanWith = change => {
+    const plan = longPlan()
+    change(plan)
+    return plan
+  }
+
+  test('a plan that follows the schedule passes', () => {
+    expect(context().schedule.map(week => week.kind)).toEqual(['build', 'build', 'build', 'lighter', 'build', 'build', 'taper', 'test'])
+    expect(checkPlan(longPlan(), context())).toEqual([])
+  })
+
+  test('a lighter week has at most 60% of the sets', () => {
+    const plan = longPlanWith(plan => plan.weeks[3].days.forEach(day => day.exercises.forEach(item => { item.sets = 2 })))
+    expect(checkPlan(plan, context())).toEqual([{ path: 'weeks[3]', message: 'week 4 is a lighter week: at most 16 sets (60% of week 3\'s 27); it has 18' }])
+  })
+
+  test('a lighter week is no heavier than the build week before it', () => {
+    const plan = longPlanWith(plan => plan.weeks[3].days.forEach(day => { day.exercises[0].weight.amount = 175 }))
+    expect(checkPlan(plan, context())).toEqual(expect.arrayContaining([{
+      path: 'weeks[3].days[0].exercises[0].weight',
+      message: 'Barbell bench press is heavier than in week 3 (170 lbs); a lighter week keeps it there or below'
+    }]))
+  })
+
+  test('after a lighter week the climb carries on from the build week before it', () => {
+    // 135 in the lighter week; 175 in week 5 is a jump from 170 (week 3), not from 135
+    const plan = longPlanWith(plan => plan.weeks[3].days.forEach(day => { day.exercises[0].weight.amount = 135 }))
+    expect(checkPlan(plan, context())).toEqual([])
   })
 })
 

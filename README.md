@@ -26,6 +26,21 @@ exact field and the model can fix it.</p>
 <p>A plan is weeks of training days. A day is placed by <code>dayOfWeek</code> (1 Monday to 7 Sunday), so the checks can see
 rest between days; saving a plan turns these into future-dated workouts from its start date. LJS-2, 2026-11-26.</p>
 </dd>
+<dt><a href="#module_planSchedule">planSchedule</a></dt>
+<dd><p>The shape of a plan&#39;s weeks, decided by code before the model sees anything: when each week starts, which
+training phase it falls in (cut, maintain or bulk), and what kind of week it is. The model fills the weeks in;
+the checks hold it to this schedule. LJS-2, 2026-11-27.</p>
+<p>Kinds of week:</p>
+<ul>
+<li><code>build</code>: normal training, weights climb.</li>
+<li><code>lighter</code>: a planned easier week every <code>deloadEvery</code> weeks (Joshua&#39;s history dips about every 3-4 weeks, so plan
+it instead of hitting it). Fewer sets, no heavier than the last build week.</li>
+<li><code>taper</code>: the week before the goal test. Fewer sets, weights may still climb a little.</li>
+<li><code>test</code>: the last week, where the goal is tested.</li>
+</ul>
+<p>Phases set the pace: strength climbs faster in a bulk than in a cut. A phase comes from the profile&#39;s calendar;
+a week outside every phase is <code>maintain</code>.</p>
+</dd>
 <dt><a href="#module_planFixture">planFixture</a></dt>
 <dd><p>A small gym and history for the plan tests (and later the evals&#39; mocks): rows as the database holds them, a goal,
 and a plan that passes every check, to break one rule at a time.</p>
@@ -33,7 +48,8 @@ and a plan that passes every check, to break one rule at a time.</p>
 <dt><a href="#module_planContext">planContext</a></dt>
 <dd><p>What a plan is built from, gathered by code (never by the model): the exercises this gym&#39;s equipment allows, each
 with the muscles it works, its last session and an estimated one-rep max, plus the goal, the gym profile and the
-muscles that need attention now. The same context goes to the model and to the checks. LJS-2, 2026-11-26.</p>
+muscles that need attention now, and the schedule of weeks (planSchedule.js). The same context goes to the model
+and to the checks. LJS-2, 2026-11-26.</p>
 </dd>
 <dt><a href="#module_planChecks">planChecks</a></dt>
 <dd><p>The code that checks a plan: the model proposes, these decide. Every error names the exact field
@@ -236,6 +252,122 @@ rest between days; saving a plan turns these into future-dated workouts from its
 The JSON schema of a plan, for the model's structured output.
 
 **Kind**: static constant of [<code>planSchema</code>](#module_planSchema)  
+<a name="module_planSchedule"></a>
+
+## planSchedule
+The shape of a plan's weeks, decided by code before the model sees anything: when each week starts, which
+training phase it falls in (cut, maintain or bulk), and what kind of week it is. The model fills the weeks in;
+the checks hold it to this schedule. LJS-2, 2026-11-27.
+
+Kinds of week:
+- `build`: normal training, weights climb.
+- `lighter`: a planned easier week every `deloadEvery` weeks (Joshua's history dips about every 3-4 weeks, so plan
+  it instead of hitting it). Fewer sets, no heavier than the last build week.
+- `taper`: the week before the goal test. Fewer sets, weights may still climb a little.
+- `test`: the last week, where the goal is tested.
+
+Phases set the pace: strength climbs faster in a bulk than in a cut. A phase comes from the profile's calendar;
+a week outside every phase is `maintain`.
+
+
+* [planSchedule](#module_planSchedule)
+    * _static_
+        * [.PHASE_PACE](#module_planSchedule.PHASE_PACE)
+        * [.planStart](#module_planSchedule.planStart) ⇒ <code>Date</code>
+        * [.phaseOn](#module_planSchedule.phaseOn) ⇒ <code>string</code>
+        * [.buildSchedule](#module_planSchedule.buildSchedule) ⇒ <code>Array.&lt;ScheduleWeek&gt;</code>
+        * [.reachableMax](#module_planSchedule.reachableMax) ⇒ <code>number</code>
+    * _inner_
+        * [~isLighter(week, weeks, deloadEvery)](#module_planSchedule..isLighter) ⇒ <code>boolean</code>
+        * [~ScheduleWeek](#module_planSchedule..ScheduleWeek) : <code>Object</code>
+
+<a name="module_planSchedule.PHASE_PACE"></a>
+
+### planSchedule.PHASE\_PACE
+How fast strength can climb in each phase: `gainPerWeek` is how much the estimated max can grow a week (for
+judging a goal), `maxJump` how much a lift's top weight may rise from one week to the next. Starting points, to
+tune from real history (WP-12).
+
+**Kind**: static constant of [<code>planSchedule</code>](#module_planSchedule)  
+<a name="module_planSchedule.planStart"></a>
+
+### planSchedule.planStart ⇒ <code>Date</code>
+The first day of a plan: the next Monday after today (a plan made on a Monday starts a week later, so there's
+time to read it).
+
+**Kind**: static constant of [<code>planSchedule</code>](#module_planSchedule)  
+**Returns**: <code>Date</code> - local midnight  
+
+| Param | Type |
+| --- | --- |
+| today | <code>Date</code> | 
+
+<a name="module_planSchedule.phaseOn"></a>
+
+### planSchedule.phaseOn ⇒ <code>string</code>
+The phase on a date, from the profile's calendar; `maintain` when no phase covers it. Dates are 'YYYY-MM-DD'
+and both ends count; a phase with no `to` runs on.
+
+**Kind**: static constant of [<code>planSchedule</code>](#module_planSchedule)  
+
+| Param | Type |
+| --- | --- |
+| phases | <code>Array.&lt;{phase: string, from: string, to: (string\|undefined)}&gt;</code> | 
+| date | <code>string</code> | 
+
+<a name="module_planSchedule.buildSchedule"></a>
+
+### planSchedule.buildSchedule ⇒ <code>Array.&lt;ScheduleWeek&gt;</code>
+The schedule for a plan of `weeks` weeks starting the Monday after `today`.
+
+**Kind**: static constant of [<code>planSchedule</code>](#module_planSchedule)  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| options | <code>Object</code> |  |
+| options.weeks | <code>number</code> |  |
+| options.profile | <code>GymProfile</code> | reads `deloadEvery` (default 4) and `phases` |
+| options.today | <code>Date</code> |  |
+
+<a name="module_planSchedule.reachableMax"></a>
+
+### planSchedule.reachableMax ⇒ <code>number</code>
+How far the estimated max can realistically climb over the schedule: each week adds its phase's gain.
+
+**Kind**: static constant of [<code>planSchedule</code>](#module_planSchedule)  
+
+| Param | Type |
+| --- | --- |
+| estimatedMax | <code>number</code> | 
+| schedule | <code>Array.&lt;ScheduleWeek&gt;</code> | 
+
+<a name="module_planSchedule..isLighter"></a>
+
+### planSchedule~isLighter(week, weeks, deloadEvery) ⇒ <code>boolean</code>
+Which weeks are lighter: every `deloadEvery`-th week, but none in the last three (the taper is light already,
+and two light weeks in a row lose ground). Off when `deloadEvery` is 0, null or below 2.
+
+**Kind**: inner method of [<code>planSchedule</code>](#module_planSchedule)  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| week | <code>number</code> | counts from 1 |
+| weeks | <code>number</code> | the plan's length |
+| deloadEvery | <code>number</code> \| <code>null</code> |  |
+
+<a name="module_planSchedule..ScheduleWeek"></a>
+
+### planSchedule~ScheduleWeek : <code>Object</code>
+**Kind**: inner typedef of [<code>planSchedule</code>](#module_planSchedule)  
+**Properties**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| week | <code>number</code> | counts from 1 |
+| startDate | <code>string</code> | its Monday, 'YYYY-MM-DD' |
+| phase | <code>string</code> | 'cut', 'maintain' or 'bulk' |
+| kind | <code>string</code> | 'build', 'lighter', 'taper' or 'test' |
+
 <a name="module_planFixture"></a>
 
 ## planFixture
@@ -247,7 +379,8 @@ and a plan that passes every check, to break one rule at a time.
 ## planContext
 What a plan is built from, gathered by code (never by the model): the exercises this gym's equipment allows, each
 with the muscles it works, its last session and an estimated one-rep max, plus the goal, the gym profile and the
-muscles that need attention now. The same context goes to the model and to the checks. LJS-2, 2026-11-26.
+muscles that need attention now, and the schedule of weeks (planSchedule.js). The same context goes to the model
+and to the checks. LJS-2, 2026-11-26.
 
 
 * [planContext](#module_planContext)
@@ -331,6 +464,9 @@ and list it there. The limits are starting points, kept in `LIMITS` to tune from
     * _inner_
         * [~layOut(plan, context)](#module_planChecks..layOut) ⇒ <code>PlanLayout</code>
         * [~weightedSetsByMuscleAndDay()](#module_planChecks..weightedSetsByMuscleAndDay) ⇒ <code>Map.&lt;string, Map.&lt;number, number&gt;&gt;</code>
+        * [~setsByWeek()](#module_planChecks..setsByWeek)
+        * [~topWeights()](#module_planChecks..topWeights)
+        * [~buildWeekBefore()](#module_planChecks..buildWeekBefore)
         * [~weeksMatchGoal()](#module_planChecks..weeksMatchGoal)
         * [~weeksAreNumbered()](#module_planChecks..weeksAreNumbered)
         * [~daysFitTheWeek()](#module_planChecks..daysFitTheWeek)
@@ -344,6 +480,7 @@ and list it there. The limits are starting points, kept in `LIMITS` to tune from
         * [~weeklySetsPerMuscle()](#module_planChecks..weeklySetsPerMuscle)
         * [~restBetweenHardDays()](#module_planChecks..restBetweenHardDays)
         * [~weightsRiseGradually()](#module_planChecks..weightsRiseGradually)
+        * [~lighterWeeksAreLighter()](#module_planChecks..lighterWeeksAreLighter)
         * [~lastWeekTestsGoal()](#module_planChecks..lastWeekTestsGoal)
         * [~PlanError](#module_planChecks..PlanError) : <code>Object</code>
         * [~PlanLayout](#module_planChecks..PlanLayout) : <code>Object</code>
@@ -411,6 +548,24 @@ triceps is 1.5 for triceps).
 
 **Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
 **Returns**: <code>Map.&lt;string, Map.&lt;number, number&gt;&gt;</code> - muscleId -> dayNumber -> weighted sets  
+<a name="module_planChecks..setsByWeek"></a>
+
+### planChecks~setsByWeek()
+All the sets planned in each week, by week index.
+
+**Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
+<a name="module_planChecks..topWeights"></a>
+
+### planChecks~topWeights()
+The heaviest entry of each loaded lift in each week: exerciseId -> weekIndex -> entry.
+
+**Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
+<a name="module_planChecks..buildWeekBefore"></a>
+
+### planChecks~buildWeekBefore()
+The index of the last build week before this one, or -1.
+
+**Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
 <a name="module_planChecks..weeksMatchGoal"></a>
 
 ### planChecks~weeksMatchGoal()
@@ -487,8 +642,16 @@ A muscle worked hard one day gets the next day off from hard work (also from a S
 <a name="module_planChecks..weightsRiseGradually"></a>
 
 ### planChecks~weightsRiseGradually()
-Each lift's top weight rises at most 10% a week (or one step of its equipment, when that's more), starting from
-its last logged session. Dropping is always fine.
+Each lift's top weight rises at most its phase's jump a week (10% in a bulk, 5% in a cut; or one step of its
+equipment, when that's more), starting from its last logged session. A lighter week isn't the baseline for the
+week after it: the climb carries on from the build week before. Dropping is always fine.
+
+**Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
+<a name="module_planChecks..lighterWeeksAreLighter"></a>
+
+### planChecks~lighterWeeksAreLighter()
+A lighter week has at most 60% of the sets of the build week before it, and no lift heavier than in that week.
+The taper week has at most 70% of the sets (its weights follow the usual climb).
 
 **Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
 <a name="module_planChecks..lastWeekTestsGoal"></a>
@@ -613,6 +776,8 @@ Whether the equipment can make exactly this weight, in its own unit.
 | equipment | <code>Object.&lt;string, Equipment&gt;</code> | by equipment id; missing means the gym doesn't have it |
 | mustInclude | <code>Array.&lt;string&gt;</code> | exercise ids |
 | avoid | <code>Array.&lt;string&gt;</code> | exercise ids |
+| [deloadEvery] | <code>number</code> \| <code>null</code> | a lighter week every this many weeks (default 4; 0 or null: none) |
+| [phases] | <code>Array.&lt;{phase: string, from: string, to: (string\|undefined)}&gt;</code> | 'cut', 'maintain' or 'bulk' from one date to another ('YYYY-MM-DD', both ends included); a date outside them is maintain |
 
 <a name="module_units"></a>
 
@@ -1434,6 +1599,7 @@ is already more than a day before the local "now" (21:30 in Toronto counted yest
 | today | <code>string</code> | 'YYYY-MM-DD' |
 | goal | <code>Object</code> | the goal with its exercise's name, its estimated max now and the max the target implies |
 | profile | <code>GymProfile</code> |  |
+| schedule | <code>Array.&lt;ScheduleWeek&gt;</code> | each week's start, phase and kind (build, lighter, taper, test) |
 | exercises | [<code>Array.&lt;ContextExercise&gt;</code>](#ContextExercise) |  |
 | musclePriority | <code>Array.&lt;Object&gt;</code> |  |
 
