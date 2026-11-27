@@ -13,7 +13,7 @@
     "sass": "gulp sass",
     "db:pack": "node -e \"import('./assets/js/data/index.js').then(({ packDatabase }) => packDatabase()).then(r => console.log('database/ packed:', r))\"",
     "serve:api": "node server/server.js",
-    "plan": "node scripts/generate-plan.js",
+    "plan": "node --env-file-if-exists=$HOME/.config/anthropic/env scripts/generate-plan.js",
     "test": "gulp testFull",
     "test:quick": "gulp testQuick",
     "watch": "gulp watchFull",

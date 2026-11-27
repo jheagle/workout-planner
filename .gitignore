@@ -10,3 +10,6 @@ node_modules/
 
 # Build output: intermediate step for the browser/ bundle (built by npm run build), not committed
 /dist
+
+# Local secrets (the Anthropic API key for npm run plan): never committed
+.env

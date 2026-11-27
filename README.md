@@ -498,6 +498,7 @@ Needs credentials in the environment (ANTHROPIC_API_KEY); the SDK is loaded only
 | [options.model] | <code>string</code> |  |
 | [options.effort] | <code>string</code> | 'low' to 'max' |
 | [options.maxTokens] | <code>number</code> |  |
+| [options.onProgress] | <code>function</code> | called as the reply comes in, with `{phase, characters}`: phase 'sent' (the request is out), 'thinking' or 'writing'; characters is how much of the plan has been written so far. A plan takes minutes, so this is how a caller shows it is still working. |
 
 <a name="module_planModel.fakePlanModel"></a>
 
