@@ -1,5 +1,5 @@
 import { generatePlan } from './generatePlan.js'
-import { fakePlanModel } from './planModel.js'
+import { fakePlanModel, PlanModelError } from './planModel.js'
 import { fixtureGoal, fixtureProfile, fixtureRows, fixtureToday, validPlan } from './planFixture.js'
 
 const run = (model, overrides = {}) => generatePlan({
@@ -63,6 +63,25 @@ describe('generatePlan', () => {
     const model = fakePlanModel([brokenPlan()])
     expect((await run(model, { fixRounds: 0 })).status).toBe('failed')
     expect(model.requests).toHaveLength(1)
+  })
+
+  test('a model error in the fix round keeps the first round', async () => {
+    const model = fakePlanModel([brokenPlan()])
+    const result = await run(model)
+    expect(result.status).toBe('model-error')
+    expect(result.reason).toBe('request')
+    expect(result.errors).toEqual([{ path: '', message: 'no more fake replies' }])
+    expect(result.rounds).toHaveLength(1)
+    expect(result.rounds[0].errors).toHaveLength(1)
+    expect(result.plan).toEqual(brokenPlan())
+  })
+
+  test('a decline in the first round: model-error with its reason and no plan', async () => {
+    const declined = new PlanModelError('refusal', 'the model declined')
+    const model = { name: 'declines', propose: async () => { throw declined } }
+    const result = await run(model)
+    expect(result).toMatchObject({ status: 'model-error', reason: 'refusal', plan: null, rounds: [] })
+    expect(result.errors[0].message).toBe('the model declined')
   })
 
   test('an unrealistic goal never reaches the model', async () => {

@@ -47,8 +47,9 @@ const main = async () => {
     const { input_tokens: input = 0, output_tokens: output = 0, cache_read_input_tokens: cached = 0 } = round.usage || {}
     console.log(`Round ${index + 1} (${round.model}): ${round.errors.length} errors; tokens in ${input} (cached ${cached}), out ${output}`)
   })
-  console.log(`Status: ${result.status}`)
+  console.log(`Status: ${result.status}${result.reason ? ` (${result.reason})` : ''}`)
   result.errors.forEach(({ path, message }) => console.log(`  - ${path || 'plan'}: ${message}`))
+  if (result.status !== 'ok') process.exitCode = 1
   if (!result.plan) return
   const json = JSON.stringify(result.plan, null, 2)
   const out = option('out')

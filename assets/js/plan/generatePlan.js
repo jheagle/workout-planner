@@ -13,12 +13,14 @@ import { planSchema } from './planSchema.js'
 
 /**
  * @typedef {Object} PlanResult
- * @property {string} status - 'ok' (the plan passes every check), 'failed' (still errors after the fix rounds) or
- * 'goal-rejected' (the goal can't be planned; no model call)
+ * @property {string} status - 'ok' (the plan passes every check), 'failed' (still errors after the fix rounds),
+ * 'goal-rejected' (the goal can't be planned; no model call) or 'model-error' (the model gave no plan: it declined, ran
+ * out of room, or the request failed; the rounds before it are kept)
  * @property {(Plan|null)} plan - the last plan the model gave
  * @property {PlanError[]} errors - what's still wrong (none when ok)
  * @property {Array<{plan: (Plan|null), errors: PlanError[], usage: Object, model: string}>} rounds
  * @property {PlanContext} context
+ * @property {string} [reason] - with 'model-error': 'refusal', 'max_tokens' or 'request'
  */
 
 /**
@@ -40,7 +42,21 @@ export const generatePlan = async ({ goal, profile, rows, model, today = new Dat
   const { system, messages } = buildPrompt(context)
   const rounds = []
   for (let round = 0; round <= fixRounds; round++) {
-    const reply = await model.propose({ system, messages, schema: planSchema })
+    let reply
+    try {
+      reply = await model.propose({ system, messages, schema: planSchema })
+    } catch (error) {
+      // Keep what the earlier rounds found and cost; a decline in the fix round shouldn't hide the first round
+      const last = rounds[rounds.length - 1]
+      return {
+        status: 'model-error',
+        reason: error.reason || 'request',
+        plan: last ? last.plan : null,
+        errors: [{ path: '', message: error.message }],
+        rounds,
+        context
+      }
+    }
     const errors = reply.plan ? checkPlan(reply.plan, context) : [{ path: '', message: 'the reply was not a JSON plan' }]
     rounds.push({ plan: reply.plan, errors, usage: reply.usage, model: reply.model })
     if (!errors.length) return { status: 'ok', plan: reply.plan, errors, rounds, context }

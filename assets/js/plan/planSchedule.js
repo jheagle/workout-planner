@@ -108,12 +108,12 @@ export const buildSchedule = ({ weeks, profile, today, startDate }) => {
   return Array.from({ length: count }, (_, index) => {
     const week = index + 1
     // Noon, so a daylight-saving change never moves the date
-    const startDate = localDate(new Date(start.getTime() + index * 7 * MILLISECONDS_PER_DAY + MILLISECONDS_PER_DAY / 2))
+    const monday = localDate(new Date(start.getTime() + index * 7 * MILLISECONDS_PER_DAY + MILLISECONDS_PER_DAY / 2))
     let kind = 'build'
     if (week === count) kind = 'test'
     else if (week === count - 1) kind = 'taper'
     else if (isLighter(week, count, deloadEvery)) kind = 'lighter'
-    return { week, startDate, phase: phaseOn(profile.phases, startDate), kind }
+    return { week, startDate: monday, phase: phaseOn(profile.phases, monday), kind }
   })
 }
 

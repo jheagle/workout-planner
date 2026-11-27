@@ -973,11 +973,12 @@ A plan for one goal.
 
 | Name | Type | Description |
 | --- | --- | --- |
-| status | <code>string</code> | 'ok' (the plan passes every check), 'failed' (still errors after the fix rounds) or 'goal-rejected' (the goal can't be planned; no model call) |
+| status | <code>string</code> | 'ok' (the plan passes every check), 'failed' (still errors after the fix rounds), 'goal-rejected' (the goal can't be planned; no model call) or 'model-error' (the model gave no plan: it declined, ran out of room, or the request failed; the rounds before it are kept) |
 | plan | [<code>Plan</code>](#Plan) \| <code>null</code> | the last plan the model gave |
 | errors | <code>Array.&lt;PlanError&gt;</code> | what's still wrong (none when ok) |
 | rounds | <code>Array.&lt;{plan: (Plan\|null), errors: Array.&lt;PlanError&gt;, usage: Object, model: string}&gt;</code> |  |
 | context | [<code>PlanContext</code>](#PlanContext) |  |
+| [reason] | <code>string</code> | with 'model-error': 'refusal', 'max_tokens' or 'request' |
 
 <a name="module_units"></a>
 
