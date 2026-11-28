@@ -238,6 +238,22 @@ describe('checkPlan with the profile\'s week', () => {
     expect(checkPlan(validPlan(), withProfile({ otherTraining: [{ dayOfWeek: 2, activity: 'swim' }] }))).toEqual([])
   })
 
+  test('bodyweight reps stay within the person\'s max: 85% of it a set with 2+ sets', () => {
+    // The fixture plans pull-ups 3 x 8 (2 x 8 in the taper): a max of 10 allows 8 a set, a max of 9 only 7
+    expect(checkPlan(validPlan(), withProfile({ repMaxes: { pullup: 10 } }))).toEqual([])
+    const errors = checkPlan(validPlan(), withProfile({ repMaxes: { pullup: 9 } }))
+    expect(errors).toHaveLength(12)
+    expect(errors[0]).toEqual({
+      path: 'weeks[0].days[0].exercises[2].reps',
+      message: '3 x 8 Pull-up is more than the person can do (max 9 in one set); at most 7 a set with 3 sets'
+    })
+    // One set may go to the max, not past it
+    const repErrors = plan => checkPlan(plan, withProfile({ repMaxes: { pullup: 9 } })).filter(error => error.path === 'weeks[0].days[0].exercises[2].reps')
+    const oneSet = reps => planWith(plan => Object.assign(plan.weeks[0].days[0].exercises[2], { sets: 1, reps }))
+    expect(repErrors(oneSet(9))).toEqual([])
+    expect(repErrors(oneSet(10))[0].message).toBe('10 Pull-up is more than the person\'s max of 9')
+  })
+
   test('a machine of its own sets the weights, and the error names it', () => {
     const machines = { bench: { equipment: 'barbell', name: 'bench station', unit: 'lbs', min: 45, step: 10 } }
     const errors = checkPlan(validPlan(), withProfile({ machines }))

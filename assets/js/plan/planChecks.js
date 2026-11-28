@@ -28,7 +28,8 @@ export const LIMITS = {
   workedDaySets: 1, // weighted sets on a day that count as working a muscle group that day
   minDaysBetweenHardDays: 2, // no muscle hard on two days in a row
   lighterSetsShare: 0.6, // a lighter week has at most 60% of the sets of the build week before it
-  taperSetsShare: 0.7 // the taper week has at most 70%
+  taperSetsShare: 0.7, // the taper week has at most 70%
+  multiSetRepShare: 0.85 // with 2+ sets of a bodyweight exercise, each set's reps are at most 85% of the person's max
   // How fast weights may climb depends on the phase: PHASE_PACE in planSchedule.js
 }
 
@@ -286,6 +287,25 @@ const setsAndRepsInRange = ({ items }, { profile }) => {
 }
 
 /**
+ * A bodyweight exercise with a known rep max (profile.repMaxes) is planned at what the person can do: one set at most
+ * the max, and with 2+ sets at most 85% of it (rounded down), since every set has the same reps and the later ones
+ * come tired. A max of 12 pull-ups allows 1 x 12 or 2 x 10, not 2 x 12. Past it, the way on is assisted reps (a
+ * counterweight machine), not more reps than the person has.
+ */
+const repsWithinMax = ({ items }, { profile }) => {
+  const maxes = profile.repMaxes || {}
+  return known(items).flatMap(({ path, item, exercise }) => {
+    const max = maxes[exercise.id]
+    if (!max || item.weight || !Number.isInteger(item.sets) || !Number.isInteger(item.reps)) return []
+    const cap = item.sets > 1 ? Math.floor(max * LIMITS.multiSetRepShare) : max
+    if (item.reps <= cap) return []
+    return [error(`${path}.reps`, item.sets > 1
+      ? `${item.sets} x ${item.reps} ${exercise.name} is more than the person can do (max ${max} in one set); at most ${cap} a set with ${item.sets} sets`
+      : `${item.reps} ${exercise.name} is more than the person's max of ${max}`)]
+  })
+}
+
+/**
  * A loaded exercise names its equipment and has a weight that equipment can make (the error says the nearest it
  * can); a bodyweight exercise has neither.
  */
@@ -517,6 +537,7 @@ export const PLAN_RULES = [
   sessionsStartRight,
   exercisesAreKnown,
   setsAndRepsInRange,
+  repsWithinMax,
   weightsFitEquipment,
   sessionsFitTheTime,
   mustIncludesEveryWeek,
