@@ -29,6 +29,8 @@ export const planInstructions = () => [
   '- exerciseId is an id from context.exercises. Never an exercise on profile.avoid; every exercise on profile.mustInclude in every week. ' +
   'When profile.firstExercise is set, every session starts with it.',
   `- sets from ${LIMITS.minSets} to ${LIMITS.maxSets} (or profile.setsPerExercise.min to max, when set), reps from ${LIMITS.minReps} to ${LIMITS.maxReps}, whole numbers.`,
+  '- profile.repMaxes (by exercise id) is the most reps the person can do of a bodyweight exercise. Plan no more than that in one set, and with 2+ sets ' +
+  `no more than ${percent(LIMITS.multiSetRepShare)} of it a set (rounded down).`,
   '- An exercise with a loadedEquipment names it as equipmentId and has a weight its load can make: in load.unit, ' +
   'load.min + a whole number of load.step, never above load.max (load.addOns are not used). An exercise without one has equipmentId null and weight null.',
   `- A session fits profile.sessionMinutes: ${LIMITS.warmUpMinutes} minutes of warm-up plus ${LIMITS.minutesPerSet} minutes per set.`,

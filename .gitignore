@@ -13,3 +13,6 @@ node_modules/
 
 # Local secrets (the Anthropic API key for npm run plan): never committed
 .env
+
+# Real plans from npm run plan (Joshua's own data; eval cases stay local)
+plan.json

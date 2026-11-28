@@ -631,6 +631,7 @@ and list it there. The limits are starting points, kept in `LIMITS` to tune from
         * [~daysHaveExercises()](#module_planChecks..daysHaveExercises)
         * [~exercisesAreKnown()](#module_planChecks..exercisesAreKnown)
         * [~setsAndRepsInRange()](#module_planChecks..setsAndRepsInRange)
+        * [~repsWithinMax()](#module_planChecks..repsWithinMax)
         * [~weightsFitEquipment()](#module_planChecks..weightsFitEquipment)
         * [~sessionsFitTheTime()](#module_planChecks..sessionsFitTheTime)
         * [~mustIncludesEveryWeek()](#module_planChecks..mustIncludesEveryWeek)
@@ -781,6 +782,15 @@ Every exercise is one from the context (which already leaves out the no-gos), an
 
 ### planChecks~setsAndRepsInRange()
 Sets and reps are whole numbers in range; the profile can narrow the sets (setsPerExercise).
+
+**Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
+<a name="module_planChecks..repsWithinMax"></a>
+
+### planChecks~repsWithinMax()
+A bodyweight exercise with a known rep max (profile.repMaxes) is planned at what the person can do: one set at most
+the max, and with 2+ sets at most 85% of it (rounded down), since every set has the same reps and the later ones
+come tired. A max of 12 pull-ups allows 1 x 12 or 2 x 10, not 2 x 12. Past it, the way on is assisted reps (a
+counterweight machine), not more reps than the person has.
 
 **Kind**: inner method of [<code>planChecks</code>](#module_planChecks)  
 <a name="module_planChecks..weightsFitEquipment"></a>
@@ -1020,6 +1030,7 @@ Whether the equipment can make exactly this weight, in its own unit.
 | [minDaysPerMuscle] | <code>number</code> | days a week every muscle group is worked (a lighter or taper week too; not the test week) |
 | [firstExercise] | <code>string</code> | an exercise id every session starts with |
 | [otherTraining] | <code>Array.&lt;{dayOfWeek: number, activity: string}&gt;</code> | other training on fixed weekdays (a 'run'); the muscles it uses aren't worked hard on that day or the day before |
+| [repMaxes] | <code>Object.&lt;string, number&gt;</code> | by exercise id: the most reps the person can do in one set of a bodyweight exercise; plans stay within it (past it, the way on is assisted reps) |
 | [machines] | <code>Object.&lt;string, Machine&gt;</code> | by exercise id: the weights that exercise's machine makes, when it differs from its equipment's general values |
 | bodyweight | <code>Object</code> \| <code>null</code> |  |
 | equipment | <code>Object.&lt;string, Equipment&gt;</code> | by equipment id; missing means the gym doesn't have it |

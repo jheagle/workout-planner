@@ -75,8 +75,17 @@ export const joshuaProfile = {
     '14b1346f-de7e-4dbf-8885-4e29b2ffd835': { equipment: 'machine', name: 'standing calf raise', unit: 'lbs', min: 20, step: 20, addOns: [5, 5] },
     // Step 10 with a 5 slider, or 20 with a 5 dial: not sure, so 20, which is loadable either way
     'cc0c58c0-d307-4dda-9262-7eb554e648e8': { equipment: 'machine', name: 'chest press', unit: 'lbs', min: 20, step: 20 },
-    '8bcd9730-f417-4397-a059-8ac13a830d4f': { equipment: 'machine', name: 'shoulder press', unit: 'lbs', min: 20, step: 20 }
+    '8bcd9730-f417-4397-a059-8ac13a830d4f': { equipment: 'machine', name: 'shoulder press', unit: 'lbs', min: 20, step: 20 },
+    // Added 2026-11-27 from WP/equipment and his logs. Lat pulldown: its own machine, a fixed wide bar on a hinge
+    // (logged 150 to 190 in 10s, 205 and 215 with the add-on). Leg press: the pin-stack one (logged 300, 320; a
+    // 0/5/10/15 dial on top). Back Extension: he does it on the seated lower-back machine, not the bodyweight bench
+    // the exercise is linked to (logged 120, 125); its steps are a guess from those.
+    '8b6ff304-7371-4d58-9835-a694dc0365f1': { equipment: 'machine', name: 'lat pulldown (fixed bar on a hinge)', unit: 'lbs', min: 10, step: 10, addOns: [5] },
+    'd9c14862-d76a-41a7-b25b-890d27a8c00e': { equipment: 'machine', name: 'leg press (pin stack)', unit: 'lbs', min: 20, step: 20, addOns: [5, 10] },
+    '8556e381-4883-44c2-be3a-78c3e78e2f66': { equipment: 'machine', name: 'seated lower-back extension', unit: 'lbs', min: 10, step: 10, addOns: [5] }
   },
+  // The most reps he can do in one set, for bodyweight exercises: pull-ups about 12 (14 once). Logs: 10 a set lately.
+  repMaxes: { [PULL_UPS]: 12 },
   mustInclude: [PULL_UPS], // exercise ids every week must have
   avoid: [ // exercise ids a plan must never use
     'f0a889fb-6ce0-4511-ae93-9836b71b204c' // Lateral Raises: the previous gym's machine; this gym has none (cable or dumbbells instead)
@@ -125,6 +134,8 @@ export const joshuaProfile = {
  * @property {string} [firstExercise] - an exercise id every session starts with
  * @property {Array<{dayOfWeek: number, activity: string}>} [otherTraining] - other training on fixed weekdays (a
  * 'run'); the muscles it uses aren't worked hard on that day or the day before
+ * @property {Object<string, number>} [repMaxes] - by exercise id: the most reps the person can do in one set of a
+ * bodyweight exercise; plans stay within it (past it, the way on is assisted reps)
  * @property {Object<string, Machine>} [machines] - by exercise id: the weights that exercise's machine makes, when it
  * differs from its equipment's general values
  * @property {({amount: number, unit: string}|null)} bodyweight
